@@ -1,16 +1,11 @@
 /**
- * Elevation chart + optional OpenTopoData enrichment for missing altitudes.
+ * Elevation chart + Open-Meteo enrichment for missing altitudes (CORS-friendly).
  */
 (function (global) {
   "use strict";
 
-  const OPENTOPO_URL = "https://api.opentopodata.org/v1/aster30m";
-  const BATCH_SIZE = 90;
-  const BATCH_DELAY_MS = 1100;
-
-  function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms));
-  }
+  const OPEN_METEO_URL = "https://api.open-meteo.com/v1/elevation";
+  const BATCH_SIZE = 100;
 
   function needsElevationEnrichment(points) {
     if (!points.length) return false;
@@ -19,15 +14,16 @@
   }
 
   async function fetchBatch(locations) {
-    const loc = locations.map(([lat, lon]) => `${lat},${lon}`).join("|");
-    const url = `${OPENTOPO_URL}?locations=${encodeURIComponent(loc)}`;
+    const lats = locations.map(([lat]) => lat).join(",");
+    const lons = locations.map(([, lon]) => lon).join(",");
+    const url = `${OPEN_METEO_URL}?latitude=${encodeURIComponent(lats)}&longitude=${encodeURIComponent(lons)}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`OpenTopoData HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
     const data = await res.json();
-    if (data.status !== "OK" || !Array.isArray(data.results)) {
-      throw new Error(data.error || "Respuesta OpenTopoData inválida");
+    if (!Array.isArray(data.elevation)) {
+      throw new Error("Respuesta de elevación inválida");
     }
-    return data.results.map((r) => (r && r.elevation != null ? r.elevation : null));
+    return data.elevation;
   }
 
   /**
@@ -44,7 +40,6 @@
 
     for (let i = 0; i < locations.length; i += BATCH_SIZE) {
       const slice = locations.slice(i, i + BATCH_SIZE);
-      if (i > 0) await sleep(BATCH_DELAY_MS);
       if (onProgress) {
         onProgress(
           `Consultando elevación ${Math.min(i + slice.length, locations.length)}/${locations.length}…`
@@ -58,7 +53,7 @@
 
     let filled = 0;
     for (let i = 0; i < points.length; i++) {
-      if (elevations[i] != null) {
+      if (elevations[i] != null && Number.isFinite(elevations[i])) {
         points[i].elev = elevations[i];
         filled++;
       } else if (points[i].elev == null) {
@@ -70,7 +65,7 @@
       throw new Error("No se pudieron obtener elevaciones");
     }
 
-    return { source: "OpenTopoData ASTER", enriched: true };
+    return { source: "Open-Meteo", enriched: true };
   }
 
   function createElevationChart(canvas, points) {
@@ -120,12 +115,6 @@
             ticks: {
               color: "#8b9aab",
               maxTicksLimit: 8,
-              callback(value, index) {
-                const label = this.getLabelForValue(value);
-                return typeof label === "string" || typeof label === "number"
-                  ? label
-                  : index;
-              },
             },
             grid: { color: "rgba(139,154,171,0.12)" },
           },
