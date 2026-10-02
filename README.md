@@ -9,7 +9,7 @@ Visor web de rutas KML para escritorio y móvil. Funciona en **GitHub Pages** si
 - Mapa con capas **Carretera**, **Satélite** e **Híbrida** (OpenStreetMap + Esri)
 - Barra deslizante para recorrer cada punto de la ruta
 - Popup / panel con latitud, longitud, elevación y distancia acumulada
-- Botón **Inferir dirección** (geocodificación inversa gratuita vía BigDataCloud / Nominatim OSM)
+- Botón **Inferir dirección** (geocodificación inversa gratuita: Nominatim OSM → Photon → BigDataCloud; Nominatim ~1 req/s)
 - Perfil de elevación (Chart.js). Si el KML no trae alturas, se consultan con [Open-Meteo Elevation](https://open-meteo.com/en/docs/elevation-api) (sin API key)
 
 ## Muestra incluida

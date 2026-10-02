@@ -177,50 +177,120 @@
     }
   }
 
+  function uniqueJoin(parts) {
+    return parts.filter((v, i, arr) => v && arr.indexOf(v) === i).join(", ") || null;
+  }
+
+  function formatStreetLine(street, houseNumber) {
+    if (!street && !houseNumber) return null;
+    if (street && houseNumber) return `${street} ${houseNumber}`;
+    return street || houseNumber;
+  }
+
+  function formatNominatimAddress(data) {
+    const a = data && data.address;
+    if (a) {
+      const street =
+        a.road || a.pedestrian || a.footway || a.path || a.residential || a.cycleway;
+      const streetLine = formatStreetLine(street, a.house_number);
+      const text = uniqueJoin([
+        streetLine,
+        a.suburb || a.neighbourhood || a.quarter || a.city_district,
+        a.city || a.town || a.village || a.municipality || a.hamlet,
+        a.postcode,
+        a.state || a.region,
+        a.country,
+      ]);
+      if (text) return text;
+    }
+    return (data && data.display_name) || null;
+  }
+
+  function formatPhotonAddress(feature) {
+    const p = feature && feature.properties;
+    if (!p) return null;
+    const streetLine = formatStreetLine(p.street || p.name, p.housenumber);
+    return uniqueJoin([
+      streetLine,
+      p.district || p.neighbourhood || p.suburb,
+      p.city || p.town || p.village || p.municipality || p.locality,
+      p.postcode,
+      p.state || p.county,
+      p.country,
+    ]);
+  }
+
   function formatBigDataCloudAddress(data) {
     const parts = [
       data.locality,
       data.city,
       data.principalSubdivision,
       data.countryName,
-    ].filter((v, i, arr) => v && arr.indexOf(v) === i);
-    if (parts.length) return parts.join(", ");
+    ];
+    const text = uniqueJoin(parts);
+    if (text) return text;
     if (data.plusCode) return String(data.plusCode);
     return null;
   }
 
-  async function reverseGeocode(lat, lon) {
-    // BigDataCloud client API: free, no key, CORS-friendly
-    const bdcUrl =
-      `https://api.bigdatacloud.net/data/reverse-geocode-client` +
-      `?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}` +
-      `&localityLanguage=es`;
-    try {
-      const res = await fetch(bdcUrl);
-      if (res.ok) {
-        const data = await res.json();
-        const text = formatBigDataCloudAddress(data);
-        if (text) return { text, source: "BigDataCloud" };
-      }
-    } catch (_) {
-      /* fall through to Nominatim */
-    }
-
+  async function reverseGeocodeNominatim(lat, lon) {
     // Nominatim (OSM): free, max ~1 req/s
     const wait = Math.max(0, 1100 - (Date.now() - state.lastGeocodeAt));
     if (wait) await new Promise((r) => setTimeout(r, wait));
     const nomUrl =
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
       `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}` +
-      `&accept-language=es&zoom=18&addressdetails=0`;
+      `&accept-language=es&zoom=18&addressdetails=1`;
     state.lastGeocodeAt = Date.now();
     const res = await fetch(nomUrl, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) throw new Error(`Geocoder HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`);
     const data = await res.json();
-    if (!data || !data.display_name) throw new Error("Sin resultado de dirección");
-    return { text: data.display_name, source: "Nominatim OSM" };
+    const text = formatNominatimAddress(data);
+    if (!text) throw new Error("Sin resultado de dirección");
+    return { text, source: "Nominatim OSM" };
+  }
+
+  async function reverseGeocodePhoton(lat, lon) {
+    const url =
+      `https://photon.komoot.io/reverse?lat=${encodeURIComponent(lat)}` +
+      `&lon=${encodeURIComponent(lon)}&lang=es`;
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`Photon HTTP ${res.status}`);
+    const data = await res.json();
+    const feature = data && data.features && data.features[0];
+    const text = formatPhotonAddress(feature);
+    if (!text) throw new Error("Sin resultado de dirección");
+    return { text, source: "Photon" };
+  }
+
+  async function reverseGeocodeBigDataCloud(lat, lon) {
+    const bdcUrl =
+      `https://api.bigdatacloud.net/data/reverse-geocode-client` +
+      `?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}` +
+      `&localityLanguage=es`;
+    const res = await fetch(bdcUrl);
+    if (!res.ok) throw new Error(`BigDataCloud HTTP ${res.status}`);
+    const data = await res.json();
+    const text = formatBigDataCloudAddress(data);
+    if (!text) throw new Error("Sin resultado de dirección");
+    return { text, source: "BigDataCloud" };
+  }
+
+  async function reverseGeocode(lat, lon) {
+    // Prefer street-level OSM sources; BigDataCloud is locality-only fallback
+    try {
+      return await reverseGeocodeNominatim(lat, lon);
+    } catch (_) {
+      /* fall through */
+    }
+    try {
+      return await reverseGeocodePhoton(lat, lon);
+    } catch (_) {
+      /* fall through */
+    }
+    return reverseGeocodeBigDataCloud(lat, lon);
   }
 
   async function inferAddress(optIndex) {
