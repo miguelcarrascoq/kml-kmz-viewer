@@ -37,24 +37,25 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   });
 
-  const satellite = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    {
-      maxZoom: 19,
-      attribution: "Tiles &copy; Esri",
-    }
-  );
+  const esriImageryUrl =
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+  const esriImageryOpts = {
+    maxZoom: 19,
+    attribution: "Tiles &copy; Esri",
+  };
 
+  const satellite = L.tileLayer(esriImageryUrl, esriImageryOpts);
+
+  const hybridImagery = L.tileLayer(esriImageryUrl, esriImageryOpts);
   const hybridLabels = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
     {
       maxZoom: 19,
       attribution: "Labels &copy; Esri",
-      pane: "overlayPane",
     }
   );
 
-  const hybrid = L.layerGroup([satellite, hybridLabels]);
+  const hybrid = L.layerGroup([hybridImagery, hybridLabels]);
 
   const map = L.map("map", {
     layers: [road],
