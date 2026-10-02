@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Insta360 GPS Data</name>
+    <name>Datos demo</name>
     <Placemark>
-      <name>Insta360 GPS Data</name>
+      <name>Datos demo</name>
       <Style>
         <LineStyle>
           <color>ff2a6aef</color>

@@ -15,7 +15,7 @@ Visor web de rutas KML para escritorio y móvil. Funciona en **GitHub Pages** si
 
 | Archivo | Descripción |
 |---------|-------------|
-| `data/VID_20251121_030905_00_005.kml` | Muestra Insta360 (carga por defecto) |
+| `data/VID_20251121_030905_00_005.kml` | Datos demo (carga por defecto) |
 
 También puedes abrir cualquier `.kml` local con **Abrir KML**.
 

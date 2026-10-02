@@ -415,7 +415,7 @@
   });
 
   els.btnSample.addEventListener("click", () => {
-    loadUrl(SAMPLE_KML, "muestra Insta360");
+    loadUrl(SAMPLE_KML, "datos demo");
   });
 
   els.btnAddress.addEventListener("click", () => {
@@ -427,5 +427,5 @@
     map.invalidateSize();
   });
 
-  loadUrl(SAMPLE_KML, "muestra Insta360");
+  loadUrl(SAMPLE_KML, "datos demo");
 })();
