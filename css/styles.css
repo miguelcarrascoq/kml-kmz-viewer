@@ -293,10 +293,59 @@ body {
   margin: 10px 12px;
   font-size: 0.85rem;
   line-height: 1.4;
+  width: 200px;
+  max-width: 200px;
+  white-space: normal;
 }
 
 .leaflet-popup-content strong {
   color: #0f1419;
+}
+
+.popup-address {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(15, 20, 25, 0.12);
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.popup-address--pending {
+  color: #64748b;
+  font-style: italic;
+}
+
+.popup-address--error {
+  color: #b91c1c;
+}
+
+.btn-popup-address {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #06261c;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-popup-address:hover {
+  background: #4de0b8;
+}
+
+.btn-popup-address:active {
+  transform: scale(0.98);
 }
 
 .leaflet-control-layers {

@@ -93,14 +93,58 @@
     return `${e.toFixed(1)} m`;
   }
 
-  function pointPopupHtml(p) {
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function pointPopupHtml(p, opts = {}) {
+    const cached = state.addressCache.get(p.index);
+    let addressBlock;
+    if (opts.loading) {
+      addressBlock = `<div class="popup-address popup-address--pending">Buscando dirección…</div>`;
+    } else if (cached) {
+      addressBlock = `<div class="popup-address">${escapeHtml(cached)}</div>`;
+    } else if (opts.error) {
+      addressBlock = `
+        <div class="popup-address popup-address--error">${escapeHtml(opts.error)}</div>
+        <button type="button" class="btn-popup-address" data-point-index="${p.index}">
+          Reintentar dirección
+        </button>`;
+    } else {
+      addressBlock = `
+        <button type="button" class="btn-popup-address" data-point-index="${p.index}">
+          Inferir dirección
+        </button>`;
+    }
     return `
       <strong>Punto ${p.index + 1}</strong><br/>
       Lat: ${p.lat.toFixed(6)}<br/>
       Lon: ${p.lon.toFixed(6)}<br/>
       Elev: ${formatElev(p.elev)}<br/>
       Dist: ${formatKm(p.distanceM)}
+      ${addressBlock}
     `;
+  }
+
+  function setPopupContentForIndex(idx, opts = {}) {
+    const p = state.points[idx];
+    if (!p) return;
+    const html = pointPopupHtml(p, opts);
+    if (state.marker && state.index === idx) {
+      state.marker.setPopupContent(html);
+    }
+    if (state.vertices) {
+      state.vertices.eachLayer((layer) => {
+        const ll = layer.getLatLng();
+        if (nearestIndex(ll.lat, ll.lng) === idx) {
+          layer.setPopupContent(html);
+        }
+      });
+    }
   }
 
   function updateInfo(index) {
@@ -179,18 +223,26 @@
     return { text: data.display_name, source: "Nominatim OSM" };
   }
 
-  async function inferAddress() {
-    const p = state.points[state.index];
+  async function inferAddress(optIndex) {
+    const forIndex =
+      optIndex != null && Number.isFinite(optIndex) ? optIndex : state.index;
+    const p = state.points[forIndex];
     if (!p) return;
 
-    if (state.addressCache.has(state.index)) {
-      els.infoAddress.textContent = state.addressCache.get(state.index);
+    if (forIndex !== state.index) {
+      updateInfo(forIndex);
+    }
+
+    if (state.addressCache.has(forIndex)) {
+      const text = state.addressCache.get(forIndex);
+      els.infoAddress.textContent = text;
+      setPopupContentForIndex(forIndex);
       return;
     }
 
-    const forIndex = state.index;
     els.btnAddress.disabled = true;
     els.infoAddress.textContent = "Buscando dirección…";
+    setPopupContentForIndex(forIndex, { loading: true });
     try {
       const { text, source } = await reverseGeocode(p.lat, p.lon);
       state.addressCache.set(forIndex, text);
@@ -198,11 +250,14 @@
         els.infoAddress.textContent = text;
         setStatus(`Dirección vía ${source}`, "ok");
       }
+      setPopupContentForIndex(forIndex);
     } catch (err) {
+      const msg = "No se pudo obtener la dirección";
       if (state.index === forIndex) {
-        els.infoAddress.textContent = "No se pudo obtener la dirección";
+        els.infoAddress.textContent = msg;
         setStatus(err.message || "Error de geocodificación", "error");
       }
+      setPopupContentForIndex(forIndex, { error: msg });
     } finally {
       els.btnAddress.disabled = !state.points.length;
     }
@@ -476,6 +531,15 @@
 
   els.btnAddress.addEventListener("click", () => {
     inferAddress();
+  });
+
+  map.getContainer().addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn-popup-address");
+    if (!btn) return;
+    e.preventDefault();
+    const idx = Number(btn.dataset.pointIndex);
+    if (!Number.isFinite(idx)) return;
+    inferAddress(idx);
   });
 
   // Invalidate size after layout settles (mobile/desktop)
