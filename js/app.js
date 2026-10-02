@@ -7,6 +7,7 @@
     routeName: document.getElementById("route-name"),
     file: document.getElementById("kml-file"),
     btnSample: document.getElementById("btn-sample"),
+    btnAddress: document.getElementById("btn-address"),
     slider: document.getElementById("route-slider"),
     sliderLabel: document.getElementById("slider-label"),
     distanceLabel: document.getElementById("distance-label"),
@@ -15,6 +16,7 @@
     infoLon: document.getElementById("info-lon"),
     infoElev: document.getElementById("info-elev"),
     infoDist: document.getElementById("info-dist"),
+    infoAddress: document.getElementById("info-address"),
     status: document.getElementById("status-msg"),
     elevSource: document.getElementById("elev-source"),
     chartCanvas: document.getElementById("elev-chart"),
@@ -28,6 +30,8 @@
     polyline: null,
     marker: null,
     vertices: null,
+    addressCache: new Map(),
+    lastGeocodeAt: 0,
   };
 
   const road = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -114,6 +118,10 @@
     els.infoLon.textContent = p.lon.toFixed(6);
     els.infoElev.textContent = formatElev(p.elev);
     els.infoDist.textContent = formatKm(p.distanceM);
+    els.btnAddress.disabled = false;
+
+    const cached = state.addressCache.get(i);
+    els.infoAddress.textContent = cached || "Pulsa «Inferir dirección» para este punto";
 
     if (state.marker) {
       state.marker.setLatLng([p.lat, p.lon]);
@@ -125,11 +133,89 @@
     }
   }
 
+  function formatBigDataCloudAddress(data) {
+    const parts = [
+      data.locality,
+      data.city,
+      data.principalSubdivision,
+      data.countryName,
+    ].filter((v, i, arr) => v && arr.indexOf(v) === i);
+    if (parts.length) return parts.join(", ");
+    if (data.plusCode) return String(data.plusCode);
+    return null;
+  }
+
+  async function reverseGeocode(lat, lon) {
+    // BigDataCloud client API: free, no key, CORS-friendly
+    const bdcUrl =
+      `https://api.bigdatacloud.net/data/reverse-geocode-client` +
+      `?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}` +
+      `&localityLanguage=es`;
+    try {
+      const res = await fetch(bdcUrl);
+      if (res.ok) {
+        const data = await res.json();
+        const text = formatBigDataCloudAddress(data);
+        if (text) return { text, source: "BigDataCloud" };
+      }
+    } catch (_) {
+      /* fall through to Nominatim */
+    }
+
+    // Nominatim (OSM): free, max ~1 req/s
+    const wait = Math.max(0, 1100 - (Date.now() - state.lastGeocodeAt));
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    const nomUrl =
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
+      `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}` +
+      `&accept-language=es&zoom=18&addressdetails=0`;
+    state.lastGeocodeAt = Date.now();
+    const res = await fetch(nomUrl, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`Geocoder HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data || !data.display_name) throw new Error("Sin resultado de dirección");
+    return { text: data.display_name, source: "Nominatim OSM" };
+  }
+
+  async function inferAddress() {
+    const p = state.points[state.index];
+    if (!p) return;
+
+    if (state.addressCache.has(state.index)) {
+      els.infoAddress.textContent = state.addressCache.get(state.index);
+      return;
+    }
+
+    const forIndex = state.index;
+    els.btnAddress.disabled = true;
+    els.infoAddress.textContent = "Buscando dirección…";
+    try {
+      const { text, source } = await reverseGeocode(p.lat, p.lon);
+      state.addressCache.set(forIndex, text);
+      if (state.index === forIndex) {
+        els.infoAddress.textContent = text;
+        setStatus(`Dirección vía ${source}`, "ok");
+      }
+    } catch (err) {
+      if (state.index === forIndex) {
+        els.infoAddress.textContent = "No se pudo obtener la dirección";
+        setStatus(err.message || "Error de geocodificación", "error");
+      }
+    } finally {
+      els.btnAddress.disabled = !state.points.length;
+    }
+  }
+
   function clearRoute() {
     routeLayer.clearLayers();
     state.polyline = null;
     state.marker = null;
     state.vertices = null;
+    state.addressCache.clear();
+    els.infoAddress.textContent = "—";
+    els.btnAddress.disabled = true;
     if (state.chart) {
       state.chart.destroy();
       state.chart = null;
@@ -330,6 +416,10 @@
 
   els.btnSample.addEventListener("click", () => {
     loadUrl(SAMPLE_KML, "muestra Insta360");
+  });
+
+  els.btnAddress.addEventListener("click", () => {
+    inferAddress();
   });
 
   // Invalidate size after layout settles (mobile/desktop)

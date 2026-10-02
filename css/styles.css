@@ -236,6 +236,33 @@ body {
   font-weight: 600;
 }
 
+.address-row {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.address-row .btn {
+  align-self: flex-start;
+}
+
+.address-row .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.address-text {
+  margin: 0;
+  padding: 8px 10px;
+  background: #121820;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--text);
+  min-height: 2.4em;
+}
+
 .status {
   margin: 10px 0 0;
   font-size: 0.8rem;
