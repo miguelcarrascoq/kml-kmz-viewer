@@ -2,6 +2,8 @@
 
 Visor web de rutas KML para escritorio y móvil. Funciona en **GitHub Pages** sin API keys de mapas de pago.
 
+![Vista previa del KML Viewer](docs/preview.jpg)
+
 ## Funciones
 
 - Carga de archivos `.kml` (o la muestra incluida)
