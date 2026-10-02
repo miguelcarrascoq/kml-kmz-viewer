@@ -1,14 +1,12 @@
 (function () {
   "use strict";
 
-  const DEFAULT_KML = "./data/ruta-completa-30-09-2026.kml";
   const SAMPLE_KML = "./data/VID_20251121_030905_00_005.kml";
 
   const els = {
     routeName: document.getElementById("route-name"),
     file: document.getElementById("kml-file"),
     btnSample: document.getElementById("btn-sample"),
-    btnDefault: document.getElementById("btn-default"),
     slider: document.getElementById("route-slider"),
     sliderLabel: document.getElementById("slider-label"),
     distanceLabel: document.getElementById("distance-label"),
@@ -334,14 +332,10 @@
     loadUrl(SAMPLE_KML, "muestra Insta360");
   });
 
-  els.btnDefault.addEventListener("click", () => {
-    loadUrl(DEFAULT_KML, "ruta demo");
-  });
-
   // Invalidate size after layout settles (mobile/desktop)
   window.addEventListener("resize", () => {
     map.invalidateSize();
   });
 
-  loadUrl(DEFAULT_KML, "ruta demo");
+  loadUrl(SAMPLE_KML, "muestra Insta360");
 })();
