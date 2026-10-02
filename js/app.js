@@ -379,6 +379,51 @@
     els.elevSource.textContent = elevMeta.source;
   }
 
+  /** Convert public Google Drive share links to a direct-download URL. */
+  function normalizeGoogleDriveUrl(href) {
+    let u;
+    try {
+      u = new URL(href);
+    } catch {
+      return href;
+    }
+    if (!/(^|\.)drive\.google\.com$/i.test(u.hostname)) return href;
+
+    let fileId = null;
+    const pathMatch = u.pathname.match(/\/file\/d\/([^/]+)/);
+    if (pathMatch) fileId = pathMatch[1];
+    if (!fileId) fileId = u.searchParams.get("id");
+
+    if (!fileId) return href;
+    return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
+  }
+
+  /**
+   * Resolve ?url= from the query string.
+   * Returns { url, label }, false if present but invalid, or null if absent.
+   */
+  function resolveUrlParam() {
+    const raw = new URLSearchParams(window.location.search).get("url");
+    if (!raw || !raw.trim()) return null;
+
+    let parsed;
+    try {
+      parsed = new URL(raw.trim());
+    } catch {
+      setStatus("Parámetro url inválido (no es una URL)", "error");
+      return false;
+    }
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      setStatus("Parámetro url inválido (solo http/https)", "error");
+      return false;
+    }
+
+    const resolved = normalizeGoogleDriveUrl(parsed.href);
+    const label = parsed.pathname.split("/").filter(Boolean).pop() || resolved;
+    return { url: resolved, label };
+  }
+
   async function loadUrl(url, label) {
     setStatus(`Descargando ${label || url}…`);
     try {
@@ -387,7 +432,18 @@
       const text = await res.text();
       await loadFromText(text, label || url);
     } catch (err) {
-      setStatus(`No se pudo cargar el KML: ${err.message}`, "error");
+      const msg = err && err.message ? err.message : String(err);
+      const isNetwork =
+        err instanceof TypeError ||
+        /failed to fetch|networkerror|load failed/i.test(msg);
+      if (isNetwork) {
+        setStatus(
+          "No se pudo cargar el KML (red o CORS). El servidor debe permitir fetch desde este origen; Google Drive suele bloquearlo.",
+          "error"
+        );
+      } else {
+        setStatus(`No se pudo cargar el KML: ${msg}`, "error");
+      }
     }
   }
 
@@ -427,5 +483,10 @@
     map.invalidateSize();
   });
 
-  loadUrl(SAMPLE_KML, "datos demo");
+  const fromQuery = resolveUrlParam();
+  if (fromQuery) {
+    loadUrl(fromQuery.url, fromQuery.label);
+  } else if (fromQuery !== false) {
+    loadUrl(SAMPLE_KML, "datos demo");
+  }
 })();
