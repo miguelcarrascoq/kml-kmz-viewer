@@ -60,7 +60,7 @@
   const hybrid = L.layerGroup([hybridImagery, hybridLabels]);
 
   const map = L.map("map", {
-    layers: [road],
+    layers: [hybrid],
     zoomControl: true,
   }).setView([-37.9, -72.3], 11);
 
