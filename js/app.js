@@ -67,9 +67,9 @@
   L.control
     .layers(
       {
-        Carretera: road,
-        Satélite: satellite,
-        Híbrida: hybrid,
+        Road: road,
+        Satellite: satellite,
+        Hybrid: hybrid,
       },
       {},
       { position: "topright" }
@@ -105,23 +105,23 @@
     const cached = state.addressCache.get(p.index);
     let addressBlock;
     if (opts.loading) {
-      addressBlock = `<div class="popup-address popup-address--pending">Buscando dirección…</div>`;
+      addressBlock = `<div class="popup-address popup-address--pending">Looking up address…</div>`;
     } else if (cached) {
       addressBlock = `<div class="popup-address">${escapeHtml(cached)}</div>`;
     } else if (opts.error) {
       addressBlock = `
         <div class="popup-address popup-address--error">${escapeHtml(opts.error)}</div>
         <button type="button" class="btn-popup-address" data-point-index="${p.index}">
-          Reintentar dirección
+          Retry address
         </button>`;
     } else {
       addressBlock = `
         <button type="button" class="btn-popup-address" data-point-index="${p.index}">
-          Inferir dirección
+          Infer address
         </button>`;
     }
     return `
-      <strong>Punto ${p.index + 1}</strong><br/>
+      <strong>Point ${p.index + 1}</strong><br/>
       Lat: ${p.lat.toFixed(6)}<br/>
       Lon: ${p.lon.toFixed(6)}<br/>
       Elev: ${formatElev(p.elev)}<br/>
@@ -165,7 +165,7 @@
     els.btnAddress.disabled = false;
 
     const cached = state.addressCache.get(i);
-    els.infoAddress.textContent = cached || "Pulsa «Inferir dirección» para este punto";
+    els.infoAddress.textContent = cached || 'Press "Infer address" for this point';
 
     if (state.marker) {
       state.marker.setLatLng([p.lat, p.lon]);
@@ -240,7 +240,7 @@
     const nomUrl =
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
       `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}` +
-      `&accept-language=es&zoom=18&addressdetails=1`;
+      `&accept-language=en&zoom=18&addressdetails=1`;
     state.lastGeocodeAt = Date.now();
     const res = await fetch(nomUrl, {
       headers: { Accept: "application/json" },
@@ -248,20 +248,20 @@
     if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`);
     const data = await res.json();
     const text = formatNominatimAddress(data);
-    if (!text) throw new Error("Sin resultado de dirección");
+    if (!text) throw new Error("No address result");
     return { text, source: "Nominatim OSM" };
   }
 
   async function reverseGeocodePhoton(lat, lon) {
     const url =
       `https://photon.komoot.io/reverse?lat=${encodeURIComponent(lat)}` +
-      `&lon=${encodeURIComponent(lon)}&lang=es`;
+      `&lon=${encodeURIComponent(lon)}&lang=en`;
     const res = await fetch(url, { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(`Photon HTTP ${res.status}`);
     const data = await res.json();
     const feature = data && data.features && data.features[0];
     const text = formatPhotonAddress(feature);
-    if (!text) throw new Error("Sin resultado de dirección");
+    if (!text) throw new Error("No address result");
     return { text, source: "Photon" };
   }
 
@@ -269,12 +269,12 @@
     const bdcUrl =
       `https://api.bigdatacloud.net/data/reverse-geocode-client` +
       `?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}` +
-      `&localityLanguage=es`;
+      `&localityLanguage=en`;
     const res = await fetch(bdcUrl);
     if (!res.ok) throw new Error(`BigDataCloud HTTP ${res.status}`);
     const data = await res.json();
     const text = formatBigDataCloudAddress(data);
-    if (!text) throw new Error("Sin resultado de dirección");
+    if (!text) throw new Error("No address result");
     return { text, source: "BigDataCloud" };
   }
 
@@ -311,21 +311,21 @@
     }
 
     els.btnAddress.disabled = true;
-    els.infoAddress.textContent = "Buscando dirección…";
+    els.infoAddress.textContent = "Looking up address…";
     setPopupContentForIndex(forIndex, { loading: true });
     try {
       const { text, source } = await reverseGeocode(p.lat, p.lon);
       state.addressCache.set(forIndex, text);
       if (state.index === forIndex) {
         els.infoAddress.textContent = text;
-        setStatus(`Dirección vía ${source}`, "ok");
+        setStatus(`Address via ${source}`, "ok");
       }
       setPopupContentForIndex(forIndex);
     } catch (err) {
-      const msg = "No se pudo obtener la dirección";
+      const msg = "Could not get address";
       if (state.index === forIndex) {
         els.infoAddress.textContent = msg;
-        setStatus(err.message || "Error de geocodificación", "error");
+        setStatus(err.message || "Geocoding error", "error");
       }
       setPopupContentForIndex(forIndex, { error: msg });
     } finally {
@@ -356,7 +356,7 @@
 
     if (!points.length) {
       els.slider.disabled = true;
-      setStatus("La ruta no tiene puntos", "error");
+      setStatus("Route has no points", "error");
       return;
     }
 
@@ -407,7 +407,7 @@
 
     state.marker = L.marker(latlngs[0], {
       draggable: false,
-      title: "Posición actual",
+      title: "Current position",
       zIndexOffset: 1000,
     })
       .bindPopup(pointPopupHtml(points[0]))
@@ -447,19 +447,19 @@
   }
 
   async function loadFromText(text, label) {
-    setStatus(`Procesando ${label || "KML"}…`);
+    setStatus(`Processing ${label || "KML"}…`);
     els.slider.disabled = true;
     let track;
     try {
       track = KmlViewer.parseKml(text);
     } catch (err) {
-      setStatus(err.message || "Error al leer KML", "error");
+      setStatus(err.message || "Error reading KML", "error");
       return;
     }
 
     drawRoute(track);
 
-    let elevMeta = { source: track.hasRealElevation ? "KML" : "KML (sin altura)", enriched: false };
+    let elevMeta = { source: track.hasRealElevation ? "KML" : "KML (no altitude)", enriched: false };
     try {
       if (KmlViewer.needsElevationEnrichment(track.points)) {
         elevMeta = await KmlViewer.ensureElevations(track.points, (msg) => setStatus(msg));
@@ -486,19 +486,19 @@
         }
         setStatus(
           elevMeta.enriched
-            ? `Elevación enriquecida (${elevMeta.source}). ${track.points.length} puntos.`
-            : `Ruta lista · ${track.points.length} puntos`,
+            ? `Elevation enriched (${elevMeta.source}). ${track.points.length} points.`
+            : `Route ready · ${track.points.length} points`,
           "ok"
         );
       } else {
-        setStatus(`Ruta lista · ${track.points.length} puntos · elevación desde KML`, "ok");
+        setStatus(`Route ready · ${track.points.length} points · elevation from KML`, "ok");
       }
     } catch (err) {
       setStatus(
-        `Ruta cargada, pero falló el perfil de elevación: ${err.message}`,
+        `Route loaded, but elevation profile failed: ${err.message}`,
         "error"
       );
-      elevMeta = { source: "No disponible", enriched: false };
+      elevMeta = { source: "Unavailable", enriched: false };
     }
 
     els.elevSource.textContent = elevMeta.source;
@@ -535,12 +535,12 @@
     try {
       parsed = new URL(raw.trim());
     } catch {
-      setStatus("Parámetro url inválido (no es una URL)", "error");
+      setStatus("Invalid url parameter (not a URL)", "error");
       return false;
     }
 
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      setStatus("Parámetro url inválido (solo http/https)", "error");
+      setStatus("Invalid url parameter (http/https only)", "error");
       return false;
     }
 
@@ -550,7 +550,7 @@
   }
 
   async function loadUrl(url, label) {
-    setStatus(`Descargando ${label || url}…`);
+    setStatus(`Downloading ${label || url}…`);
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -563,11 +563,11 @@
         /failed to fetch|networkerror|load failed/i.test(msg);
       if (isNetwork) {
         setStatus(
-          "No se pudo cargar el KML (red o CORS). El servidor debe permitir fetch desde este origen; Google Drive suele bloquearlo.",
+          "Could not load KML (network or CORS). The server must allow fetch from this origin; Google Drive often blocks it.",
           "error"
         );
       } else {
-        setStatus(`No se pudo cargar el KML: ${msg}`, "error");
+        setStatus(`Could not load KML: ${msg}`, "error");
       }
     }
   }
@@ -590,13 +590,13 @@
       const text = await file.text();
       await loadFromText(text, file.name);
     } catch (err) {
-      setStatus(err.message || "Error al leer archivo", "error");
+      setStatus(err.message || "Error reading file", "error");
     }
     els.file.value = "";
   });
 
   els.btnSample.addEventListener("click", () => {
-    loadUrl(SAMPLE_KML, "datos demo");
+    loadUrl(SAMPLE_KML, "demo data");
   });
 
   els.btnAddress.addEventListener("click", () => {
@@ -621,6 +621,6 @@
   if (fromQuery) {
     loadUrl(fromQuery.url, fromQuery.label);
   } else if (fromQuery !== false) {
-    loadUrl(SAMPLE_KML, "datos demo");
+    loadUrl(SAMPLE_KML, "demo data");
   }
 })();

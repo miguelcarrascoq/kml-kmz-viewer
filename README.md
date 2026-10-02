@@ -1,49 +1,49 @@
 # KML Viewer
 
-Visor web de rutas KML para escritorio y móvil. Funciona en **GitHub Pages** sin API keys de mapas de pago.
+Web-based KML route viewer for desktop and mobile. Works on **GitHub Pages** with no paid map API keys.
 
-![Vista previa del KML Viewer](docs/preview.jpg)
+![KML Viewer preview](docs/preview.jpg)
 
-## Funciones
+## Features
 
-- Carga de archivos `.kml` (o la muestra incluida)
-- Carga remota vía parámetro GET `?url=` (KML público con CORS)
-- Mapa con capas **Carretera**, **Satélite** e **Híbrida** (OpenStreetMap + Esri)
-- Barra deslizante para recorrer cada punto de la ruta
-- Popup / panel con latitud, longitud, elevación y distancia acumulada
-- Botón **Inferir dirección** (geocodificación inversa gratuita: Nominatim OSM → Photon → BigDataCloud; Nominatim ~1 req/s)
-- Perfil de elevación (Chart.js). Si el KML no trae alturas, se consultan con [Open-Meteo Elevation](https://open-meteo.com/en/docs/elevation-api) (sin API key)
+- Load `.kml` files (or the included sample)
+- Remote load via GET parameter `?url=` (public KML with CORS)
+- Map layers: **Road**, **Satellite**, and **Hybrid** (OpenStreetMap + Esri)
+- Slider to scrub through each point on the route
+- Popup / panel with latitude, longitude, elevation, and cumulative distance
+- **Infer address** button (free reverse geocoding: Nominatim OSM → Photon → BigDataCloud; Nominatim ~1 req/s)
+- Elevation profile (Chart.js). If the KML has no altitudes, they are fetched from [Open-Meteo Elevation](https://open-meteo.com/en/docs/elevation-api) (no API key)
 
-## Muestra incluida
+## Included sample
 
-| Archivo | Descripción |
-|---------|-------------|
-| `data/VID_20251121_030905_00_005.kml` | Datos demo (carga por defecto) |
+| File | Description |
+|------|-------------|
+| `data/VID_20251121_030905_00_005.kml` | Demo data (loaded by default) |
 
-También puedes abrir cualquier `.kml` local con **Abrir KML**.
+You can also open any local `.kml` with **Open KML**.
 
-## Cargar por URL
+## Load by URL
 
-Pasa un KML público en el parámetro `url` (debe estar URL-encoded):
+Pass a public KML in the `url` parameter (must be URL-encoded):
 
 ```
 https://miguelcarrascoq.github.io/kml-viewer/?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmiguelcarrascoq%2Fkml-viewer%2Fmain%2Fdata%2FVID_20251121_030905_00_005.kml
 ```
 
-El servidor del KML debe permitir CORS (`Access-Control-Allow-Origin`). Enlaces públicos de Google Drive se convierten a descarga directa cuando es posible, pero Drive suele bloquear el `fetch` desde el navegador.
+The KML host must allow CORS (`Access-Control-Allow-Origin`). Public Google Drive links are converted to a direct-download URL when possible, but Drive often blocks `fetch` from the browser.
 
-## Uso local
+## Local usage
 
-Sirve la carpeta con cualquier servidor estático (necesario por `fetch` de los KML):
+Serve the folder with any static server (required for `fetch` of KML files):
 
 ```bash
 python3 -m http.server 8080
 ```
 
-Abre http://localhost:8080
+Open http://localhost:8080
 
 ## GitHub Pages
 
-Publicado en: https://miguelcarrascoq.github.io/kml-viewer/
+Published at: https://miguelcarrascoq.github.io/kml-viewer/
 
-Branch `main`, carpeta raíz.
+Branch `main`, root folder.

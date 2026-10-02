@@ -90,13 +90,13 @@
     const doc = new DOMParser().parseFromString(text, "application/xml");
     const parseError = doc.querySelector("parsererror");
     if (parseError) {
-      throw new Error("KML inválido o mal formado");
+      throw new Error("Invalid or malformed KML");
     }
 
     const nameEl =
       findFirst(doc, "name") ||
       doc.getElementsByTagNameNS(KML_NS, "name")[0];
-    const name = textOf(nameEl) || "Ruta sin nombre";
+    const name = textOf(nameEl) || "Unnamed route";
 
     const coordEls = findAll(doc, "coordinates");
     let raw = [];
@@ -105,7 +105,7 @@
     }
 
     if (raw.length === 0) {
-      throw new Error("No se encontraron coordenadas en el KML");
+      throw new Error("No coordinates found in the KML");
     }
 
     const points = withDistances(dedupeConsecutive(raw));

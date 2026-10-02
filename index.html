@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -12,28 +12,28 @@
   <header class="topbar">
     <div class="brand">
       <h1>KML Viewer</h1>
-      <p class="subtitle" id="route-name">Cargando ruta…</p>
+      <p class="subtitle" id="route-name">Loading route…</p>
     </div>
     <div class="actions">
       <label class="btn file-btn">
-        Abrir KML
+        Open KML
         <input type="file" id="kml-file" accept=".kml,application/vnd.google-earth.kml+xml,text/xml" />
       </label>
-      <button type="button" class="btn secondary" id="btn-sample" title="Cargar datos demo">
-        Datos demo
+      <button type="button" class="btn secondary" id="btn-sample" title="Load demo data">
+        Demo data
       </button>
     </div>
   </header>
 
   <main class="layout">
-    <section class="map-panel" aria-label="Mapa">
+    <section class="map-panel" aria-label="Map">
       <div id="map"></div>
     </section>
 
     <aside class="side-panel">
-      <section class="card" aria-label="Navegación por la ruta">
+      <section class="card" aria-label="Route navigation">
         <div class="card-head">
-          <h2>Punto en la ruta</h2>
+          <h2>Point on route</h2>
           <span class="badge" id="point-badge">—</span>
         </div>
         <input type="range" id="route-slider" min="0" max="0" value="0" step="1" disabled />
@@ -42,23 +42,23 @@
           <span id="distance-label">0 km</span>
         </div>
         <dl class="point-info" id="point-info">
-          <div><dt>Latitud</dt><dd id="info-lat">—</dd></div>
-          <div><dt>Longitud</dt><dd id="info-lon">—</dd></div>
-          <div><dt>Elevación</dt><dd id="info-elev">—</dd></div>
-          <div><dt>Distancia</dt><dd id="info-dist">—</dd></div>
+          <div><dt>Latitude</dt><dd id="info-lat">—</dd></div>
+          <div><dt>Longitude</dt><dd id="info-lon">—</dd></div>
+          <div><dt>Elevation</dt><dd id="info-elev">—</dd></div>
+          <div><dt>Distance</dt><dd id="info-dist">—</dd></div>
         </dl>
         <div class="address-row">
           <button type="button" class="btn secondary" id="btn-address" disabled>
-            Inferir dirección
+            Infer address
           </button>
           <p class="address-text" id="info-address" aria-live="polite">—</p>
         </div>
         <p class="status" id="status-msg" role="status"></p>
       </section>
 
-      <section class="card chart-card" aria-label="Perfil de elevación">
+      <section class="card chart-card" aria-label="Elevation profile">
         <div class="card-head">
-          <h2>Perfil de elevación</h2>
+          <h2>Elevation profile</h2>
           <span class="badge muted" id="elev-source">—</span>
         </div>
         <div class="chart-wrap">

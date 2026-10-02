@@ -21,7 +21,7 @@
     if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
     const data = await res.json();
     if (!Array.isArray(data.elevation)) {
-      throw new Error("Respuesta de elevación inválida");
+      throw new Error("Invalid elevation response");
     }
     return data.elevation;
   }
@@ -42,7 +42,7 @@
       const slice = locations.slice(i, i + BATCH_SIZE);
       if (onProgress) {
         onProgress(
-          `Consultando elevación ${Math.min(i + slice.length, locations.length)}/${locations.length}…`
+          `Fetching elevation ${Math.min(i + slice.length, locations.length)}/${locations.length}…`
         );
       }
       const batch = await fetchBatch(slice);
@@ -62,7 +62,7 @@
     }
 
     if (filled === 0) {
-      throw new Error("No se pudieron obtener elevaciones");
+      throw new Error("Could not fetch elevations");
     }
 
     return { source: "Open-Meteo", enriched: true };
@@ -78,7 +78,7 @@
         labels,
         datasets: [
           {
-            label: "Elevación (m)",
+            label: "Elevation (m)",
             data,
             borderColor: "#2dd4a8",
             backgroundColor: "rgba(45, 212, 168, 0.18)",
@@ -100,18 +100,18 @@
             callbacks: {
               title(items) {
                 const i = items[0]?.dataIndex ?? 0;
-                return `Punto ${i + 1} · ${labels[i]} km`;
+                return `Point ${i + 1} · ${labels[i]} km`;
               },
               label(ctx) {
                 const v = ctx.parsed.y;
-                return `Elevación: ${v != null ? v.toFixed(1) : "—"} m`;
+                return `Elevation: ${v != null ? v.toFixed(1) : "—"} m`;
               },
             },
           },
         },
         scales: {
           x: {
-            title: { display: true, text: "Distancia (km)", color: "#8b9aab" },
+            title: { display: true, text: "Distance (km)", color: "#8b9aab" },
             ticks: {
               color: "#8b9aab",
               maxTicksLimit: 8,
