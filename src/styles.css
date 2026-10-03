@@ -270,13 +270,17 @@ body {
 }
 
 .kml-tree-card {
+  /* Grow with expanded nodes; do not shrink under chart-card flex pressure */
+  flex: 0 0 auto;
   max-height: 40vh;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  overflow: hidden;
 }
 
 .kml-tree {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   font-size: 0.82rem;
   margin: 0 -4px;
