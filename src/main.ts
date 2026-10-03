@@ -60,6 +60,11 @@ const els = {
   lineWidthValue: requireEl<HTMLElement>("line-width-value"),
   lineOpacity: requireEl<HTMLInputElement>("line-opacity"),
   lineOpacityValue: requireEl<HTMLElement>("line-opacity-value"),
+  pointColor: requireEl<HTMLInputElement>("point-color"),
+  pointRadius: requireEl<HTMLInputElement>("point-radius"),
+  pointRadiusValue: requireEl<HTMLElement>("point-radius-value"),
+  pointOpacity: requireEl<HTMLInputElement>("point-opacity"),
+  pointOpacityValue: requireEl<HTMLElement>("point-opacity-value"),
 };
 
 interface LineStyle {
@@ -68,9 +73,21 @@ interface LineStyle {
   opacity: number;
 }
 
+interface PointStyle {
+  color: string;
+  radius: number;
+  opacity: number;
+}
+
 const DEFAULT_LINE_STYLE: LineStyle = {
-  color: "#2dd4a8",
+  color: "#5b9cff",
   weight: 4,
+  opacity: 0.9,
+};
+
+const DEFAULT_POINT_STYLE: PointStyle = {
+  color: "#4de0b8",
+  radius: 4,
   opacity: 0.9,
 };
 
@@ -97,6 +114,7 @@ interface AppState {
   vertices: L.LayerGroup | null;
   addressCache: Map<number, string>;
   lineStyle: LineStyle;
+  pointStyle: PointStyle;
 }
 
 const state: AppState = {
@@ -109,6 +127,7 @@ const state: AppState = {
   vertices: null,
   addressCache: new Map(),
   lineStyle: { ...DEFAULT_LINE_STYLE },
+  pointStyle: { ...DEFAULT_POINT_STYLE },
 };
 
 const road = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -178,11 +197,44 @@ function syncLineStyleInputs(): void {
   els.lineOpacityValue.textContent = `${Math.round(opacity * 100)}%`;
 }
 
+function syncPointStyleInputs(): void {
+  const { color, radius, opacity } = state.pointStyle;
+  els.pointColor.value = color;
+  els.pointRadius.value = String(radius);
+  els.pointRadiusValue.textContent = `${radius} px`;
+  els.pointOpacity.value = String(opacity);
+  els.pointOpacityValue.textContent = `${Math.round(opacity * 100)}%`;
+}
+
+function syncMapStyleInputs(): void {
+  syncLineStyleInputs();
+  syncPointStyleInputs();
+}
+
 function readLineStyleFromInputs(): LineStyle {
   return {
     color: els.lineColor.value || DEFAULT_LINE_STYLE.color,
     weight: Number(els.lineWidth.value) || DEFAULT_LINE_STYLE.weight,
     opacity: Number(els.lineOpacity.value) || DEFAULT_LINE_STYLE.opacity,
+  };
+}
+
+function readPointStyleFromInputs(): PointStyle {
+  return {
+    color: els.pointColor.value || DEFAULT_POINT_STYLE.color,
+    radius: Number(els.pointRadius.value) || DEFAULT_POINT_STYLE.radius,
+    opacity: Number(els.pointOpacity.value) || DEFAULT_POINT_STYLE.opacity,
+  };
+}
+
+function pointMarkerOptions(style: PointStyle = state.pointStyle): L.CircleMarkerOptions {
+  return {
+    radius: style.radius,
+    color: "#0f1419",
+    weight: 1,
+    fillColor: style.color,
+    fillOpacity: style.opacity,
+    opacity: Math.min(1, style.opacity + 0.1),
   };
 }
 
@@ -196,6 +248,17 @@ function applyLineStyle(style: LineStyle = state.lineStyle): void {
       opacity: style.opacity,
     });
   }
+}
+
+function applyPointStyle(style: PointStyle = state.pointStyle): void {
+  state.pointStyle = style;
+  syncPointStyleInputs();
+  if (!state.vertices) return;
+  const opts = pointMarkerOptions(style);
+  state.vertices.eachLayer((layer) => {
+    (layer as L.CircleMarker).setStyle(opts);
+    (layer as L.CircleMarker).setRadius(style.radius);
+  });
 }
 
 function escapeHtml(s: string): string {
@@ -390,16 +453,11 @@ function drawRoute(track: Track): void {
     track.paths.length === 1 && points.length <= MAX_VERTEX_MARKERS_POINTS;
   if (showVertices) {
     const step = Math.max(1, Math.floor(points.length / 80));
+    const pointOpts = pointMarkerOptions();
     state.vertices = L.layerGroup();
     for (let i = 0; i < points.length; i += step) {
       const p = points[i]!;
-      const circle = L.circleMarker([p.lat, p.lon], {
-        radius: 4,
-        color: "#0f1419",
-        weight: 1,
-        fillColor: "#4de0b8",
-        fillOpacity: 0.9,
-      });
+      const circle = L.circleMarker([p.lat, p.lon], pointOpts);
       circle.bindPopup(pointPopupHtml(p));
       circle.on("click", () => updateInfo(p.index));
       circle.addTo(state.vertices);
@@ -407,13 +465,7 @@ function drawRoute(track: Track): void {
 
     const last = points[points.length - 1]!;
     if ((points.length - 1) % step !== 0) {
-      const circle = L.circleMarker([last.lat, last.lon], {
-        radius: 4,
-        color: "#0f1419",
-        weight: 1,
-        fillColor: "#4de0b8",
-        fillOpacity: 0.9,
-      });
+      const circle = L.circleMarker([last.lat, last.lon], pointOpts);
       circle.bindPopup(pointPopupHtml(last));
       circle.on("click", () => updateInfo(last.index));
       circle.addTo(state.vertices);
@@ -603,7 +655,7 @@ function closeUrlModal(): void {
 }
 
 function openStyleModal(): void {
-  syncLineStyleInputs();
+  syncMapStyleInputs();
   els.styleModal.hidden = false;
   els.lineColor.focus();
 }
@@ -657,6 +709,18 @@ els.lineWidth.addEventListener("input", () => {
 
 els.lineOpacity.addEventListener("input", () => {
   applyLineStyle(readLineStyleFromInputs());
+});
+
+els.pointColor.addEventListener("input", () => {
+  applyPointStyle(readPointStyleFromInputs());
+});
+
+els.pointRadius.addEventListener("input", () => {
+  applyPointStyle(readPointStyleFromInputs());
+});
+
+els.pointOpacity.addEventListener("input", () => {
+  applyPointStyle(readPointStyleFromInputs());
 });
 
 els.slider.addEventListener("input", () => {
@@ -756,7 +820,7 @@ window.addEventListener("resize", () => {
   map.invalidateSize();
 });
 
-syncLineStyleInputs();
+syncMapStyleInputs();
 
 const fromQuery = resolveUrlParam();
 if (fromQuery) {

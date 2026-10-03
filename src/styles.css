@@ -378,6 +378,29 @@ body {
   width: min(360px, 100%);
 }
 
+.style-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.style-section {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #121820;
+}
+
+.style-section legend {
+  padding: 0 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .style-controls {
   display: flex;
   flex-direction: column;

@@ -73,20 +73,42 @@
   >
     <div class="modal-backdrop" data-close-style-modal></div>
     <div class="modal-panel modal-panel--style">
-      <h2 id="style-modal-title">Line style</h2>
-      <div class="style-controls">
-        <label class="style-field" for="line-color">
-          <span>Color</span>
-          <input type="color" id="line-color" value="#2dd4a8" />
-        </label>
-        <label class="style-field" for="line-width">
-          <span>Width <em id="line-width-value">4 px</em></span>
-          <input type="range" id="line-width" min="0.5" max="8" step="0.5" value="4" />
-        </label>
-        <label class="style-field" for="line-opacity">
-          <span>Opacity <em id="line-opacity-value">90%</em></span>
-          <input type="range" id="line-opacity" min="0.15" max="1" step="0.05" value="0.9" />
-        </label>
+      <h2 id="style-modal-title">Map style</h2>
+      <div class="style-sections">
+        <fieldset class="style-section">
+          <legend>Line</legend>
+          <div class="style-controls">
+            <label class="style-field" for="line-color">
+              <span>Color</span>
+              <input type="color" id="line-color" value="#5b9cff" />
+            </label>
+            <label class="style-field" for="line-width">
+              <span>Width <em id="line-width-value">4 px</em></span>
+              <input type="range" id="line-width" min="0.5" max="8" step="0.5" value="4" />
+            </label>
+            <label class="style-field" for="line-opacity">
+              <span>Opacity <em id="line-opacity-value">90%</em></span>
+              <input type="range" id="line-opacity" min="0.15" max="1" step="0.05" value="0.9" />
+            </label>
+          </div>
+        </fieldset>
+        <fieldset class="style-section">
+          <legend>Points</legend>
+          <div class="style-controls">
+            <label class="style-field" for="point-color">
+              <span>Color</span>
+              <input type="color" id="point-color" value="#4de0b8" />
+            </label>
+            <label class="style-field" for="point-radius">
+              <span>Radius <em id="point-radius-value">4 px</em></span>
+              <input type="range" id="point-radius" min="1" max="12" step="1" value="4" />
+            </label>
+            <label class="style-field" for="point-opacity">
+              <span>Opacity <em id="point-opacity-value">90%</em></span>
+              <input type="range" id="point-opacity" min="0.15" max="1" step="0.05" value="0.9" />
+            </label>
+          </div>
+        </fieldset>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn" id="btn-style-done">Done</button>
@@ -101,9 +123,9 @@
         type="button"
         class="btn map-style-btn"
         id="btn-line-style"
-        title="Adjust line color, width, and opacity"
+        title="Adjust line and point style"
       >
-        Line style
+        Map style
       </button>
     </section>
 
