@@ -34,12 +34,15 @@ const els = {
   file: requireEl<HTMLInputElement>("kml-file"),
   btnOpenUrl: requireEl<HTMLButtonElement>("btn-open-url"),
   btnSample: requireEl<HTMLButtonElement>("btn-sample"),
+  btnLineStyle: requireEl<HTMLButtonElement>("btn-line-style"),
   btnAddress: requireEl<HTMLButtonElement>("btn-address"),
   urlModal: requireEl<HTMLDivElement>("url-modal"),
   urlInput: requireEl<HTMLInputElement>("url-input"),
   urlError: requireEl<HTMLParagraphElement>("url-error"),
   btnUrlCancel: requireEl<HTMLButtonElement>("btn-url-cancel"),
   btnUrlLoad: requireEl<HTMLButtonElement>("btn-url-load"),
+  styleModal: requireEl<HTMLDivElement>("style-modal"),
+  btnStyleDone: requireEl<HTMLButtonElement>("btn-style-done"),
   slider: requireEl<HTMLInputElement>("route-slider"),
   sliderLabel: requireEl<HTMLSpanElement>("slider-label"),
   distanceLabel: requireEl<HTMLSpanElement>("distance-label"),
@@ -52,7 +55,37 @@ const els = {
   status: requireEl<HTMLParagraphElement>("status-msg"),
   elevSource: requireEl<HTMLSpanElement>("elev-source"),
   chartCanvas: requireEl<HTMLCanvasElement>("elev-chart"),
+  lineColor: requireEl<HTMLInputElement>("line-color"),
+  lineWidth: requireEl<HTMLInputElement>("line-width"),
+  lineWidthValue: requireEl<HTMLElement>("line-width-value"),
+  lineOpacity: requireEl<HTMLInputElement>("line-opacity"),
+  lineOpacityValue: requireEl<HTMLElement>("line-opacity-value"),
 };
+
+interface LineStyle {
+  color: string;
+  weight: number;
+  opacity: number;
+}
+
+const DEFAULT_LINE_STYLE: LineStyle = {
+  color: "#2dd4a8",
+  weight: 4,
+  opacity: 0.9,
+};
+
+function suggestedLineStyle(pathCount: number): LineStyle {
+  if (pathCount > 80) {
+    return { ...DEFAULT_LINE_STYLE, weight: 1, opacity: 0.7 };
+  }
+  if (pathCount > 12) {
+    return { ...DEFAULT_LINE_STYLE, weight: 1.5, opacity: 0.75 };
+  }
+  if (pathCount > 1) {
+    return { ...DEFAULT_LINE_STYLE, weight: 2.5, opacity: 0.85 };
+  }
+  return { ...DEFAULT_LINE_STYLE };
+}
 
 interface AppState {
   points: TrackPoint[];
@@ -63,6 +96,7 @@ interface AppState {
   marker: L.Marker | null;
   vertices: L.LayerGroup | null;
   addressCache: Map<number, string>;
+  lineStyle: LineStyle;
 }
 
 const state: AppState = {
@@ -74,6 +108,7 @@ const state: AppState = {
   marker: null,
   vertices: null,
   addressCache: new Map(),
+  lineStyle: { ...DEFAULT_LINE_STYLE },
 };
 
 const road = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -132,6 +167,35 @@ function formatKm(m: number): string {
 function formatElev(e: number | null | undefined): string {
   if (e == null || !Number.isFinite(e)) return "—";
   return `${e.toFixed(1)} m`;
+}
+
+function syncLineStyleInputs(): void {
+  const { color, weight, opacity } = state.lineStyle;
+  els.lineColor.value = color;
+  els.lineWidth.value = String(weight);
+  els.lineWidthValue.textContent = `${weight} px`;
+  els.lineOpacity.value = String(opacity);
+  els.lineOpacityValue.textContent = `${Math.round(opacity * 100)}%`;
+}
+
+function readLineStyleFromInputs(): LineStyle {
+  return {
+    color: els.lineColor.value || DEFAULT_LINE_STYLE.color,
+    weight: Number(els.lineWidth.value) || DEFAULT_LINE_STYLE.weight,
+    opacity: Number(els.lineOpacity.value) || DEFAULT_LINE_STYLE.opacity,
+  };
+}
+
+function applyLineStyle(style: LineStyle = state.lineStyle): void {
+  state.lineStyle = style;
+  syncLineStyleInputs();
+  if (state.polyline) {
+    state.polyline.setStyle({
+      color: style.color,
+      weight: style.weight,
+      opacity: style.opacity,
+    });
+  }
 }
 
 function escapeHtml(s: string): string {
@@ -284,12 +348,23 @@ function clearRoute(): void {
   }
 }
 
+const MAX_VERTEX_MARKERS_POINTS = 2500;
+const MAX_ELEVATION_CHART_POINTS = 2500;
+const MAX_ELEVATION_ENRICH_POINTS = 1500;
+
+function pathLatLngs(track: Track): L.LatLngExpression[][] {
+  return track.paths
+    .map((path) => path.map((p) => [p.lat, p.lon] as L.LatLngExpression))
+    .filter((path) => path.length >= 2);
+}
+
 function drawRoute(track: Track): void {
   clearRoute();
   const points = track.points;
   state.points = points;
   state.name = track.name;
   els.routeName.textContent = track.name;
+  applyLineStyle(suggestedLineStyle(track.paths.length));
 
   if (!points.length) {
     els.slider.disabled = true;
@@ -297,11 +372,12 @@ function drawRoute(track: Track): void {
     return;
   }
 
-  const latlngs: L.LatLngExpression[] = points.map((p) => [p.lat, p.lon]);
+  const latlngs = pathLatLngs(track);
+  const style = state.lineStyle;
   state.polyline = L.polyline(latlngs, {
-    color: "#2dd4a8",
-    weight: 4,
-    opacity: 0.9,
+    color: style.color,
+    weight: style.weight,
+    opacity: style.opacity,
   }).addTo(routeLayer);
 
   state.polyline.on("click", (e: L.LeafletMouseEvent) => {
@@ -310,43 +386,48 @@ function drawRoute(track: Track): void {
     if (state.marker) state.marker.openPopup();
   });
 
-  const step = Math.max(1, Math.floor(points.length / 80));
-  state.vertices = L.layerGroup();
-  for (let i = 0; i < points.length; i += step) {
-    const p = points[i]!;
-    const circle = L.circleMarker([p.lat, p.lon], {
-      radius: 4,
-      color: "#0f1419",
-      weight: 1,
-      fillColor: "#4de0b8",
-      fillOpacity: 0.9,
-    });
-    circle.bindPopup(pointPopupHtml(p));
-    circle.on("click", () => updateInfo(p.index));
-    circle.addTo(state.vertices);
+  const showVertices =
+    track.paths.length === 1 && points.length <= MAX_VERTEX_MARKERS_POINTS;
+  if (showVertices) {
+    const step = Math.max(1, Math.floor(points.length / 80));
+    state.vertices = L.layerGroup();
+    for (let i = 0; i < points.length; i += step) {
+      const p = points[i]!;
+      const circle = L.circleMarker([p.lat, p.lon], {
+        radius: 4,
+        color: "#0f1419",
+        weight: 1,
+        fillColor: "#4de0b8",
+        fillOpacity: 0.9,
+      });
+      circle.bindPopup(pointPopupHtml(p));
+      circle.on("click", () => updateInfo(p.index));
+      circle.addTo(state.vertices);
+    }
+
+    const last = points[points.length - 1]!;
+    if ((points.length - 1) % step !== 0) {
+      const circle = L.circleMarker([last.lat, last.lon], {
+        radius: 4,
+        color: "#0f1419",
+        weight: 1,
+        fillColor: "#4de0b8",
+        fillOpacity: 0.9,
+      });
+      circle.bindPopup(pointPopupHtml(last));
+      circle.on("click", () => updateInfo(last.index));
+      circle.addTo(state.vertices);
+    }
+    state.vertices.addTo(routeLayer);
   }
 
-  const last = points[points.length - 1]!;
-  if ((points.length - 1) % step !== 0) {
-    const circle = L.circleMarker([last.lat, last.lon], {
-      radius: 4,
-      color: "#0f1419",
-      weight: 1,
-      fillColor: "#4de0b8",
-      fillOpacity: 0.9,
-    });
-    circle.bindPopup(pointPopupHtml(last));
-    circle.on("click", () => updateInfo(last.index));
-    circle.addTo(state.vertices);
-  }
-  state.vertices.addTo(routeLayer);
-
-  state.marker = L.marker(latlngs[0]!, {
+  const first = points[0]!;
+  state.marker = L.marker([first.lat, first.lon], {
     draggable: false,
     title: "Current position",
     zIndexOffset: 1000,
   })
-    .bindPopup(pointPopupHtml(points[0]!))
+    .bindPopup(pointPopupHtml(first))
     .addTo(routeLayer);
 
   map.fitBounds(state.polyline.getBounds(), { padding: [28, 28] });
@@ -356,8 +437,12 @@ function drawRoute(track: Track): void {
   els.slider.max = String(points.length - 1);
   els.slider.value = "0";
 
-  state.chart = createElevationChart(els.chartCanvas, points);
-  wireChartSelect(state.chart);
+  if (points.length <= MAX_ELEVATION_CHART_POINTS) {
+    state.chart = createElevationChart(els.chartCanvas, points);
+    wireChartSelect(state.chart);
+  } else {
+    state.chart = null;
+  }
   updateInfo(0);
 }
 
@@ -390,12 +475,23 @@ async function loadFromText(text: string, label?: string): Promise<void> {
 
   drawRoute(track);
 
+  const pathCount = track.paths.length;
+  const pointCount = track.points.length;
+  const geometryLabel =
+    pathCount > 1
+      ? `${pathCount.toLocaleString()} outlines · ${pointCount.toLocaleString()} vertices`
+      : `${pointCount.toLocaleString()} points`;
+
   let elevMeta: ElevationMeta = {
     source: track.hasRealElevation ? "KML" : "KML (no altitude)",
     enriched: false,
   };
   try {
-    if (needsElevationEnrichment(track.points)) {
+    const tooLargeToEnrich = pointCount > MAX_ELEVATION_ENRICH_POINTS || pathCount > 8;
+    if (tooLargeToEnrich && needsElevationEnrichment(track.points)) {
+      elevMeta = { source: "Skipped (large KML)", enriched: false };
+      setStatus(`Ready · ${geometryLabel}`, "ok");
+    } else if (needsElevationEnrichment(track.points)) {
       elevMeta = await ensureElevations(track.points, (msg) => setStatus(msg));
       if (state.chart) {
         state.chart.destroy();
@@ -414,13 +510,13 @@ async function loadFromText(text: string, label?: string): Promise<void> {
       }
       setStatus(
         elevMeta.enriched
-          ? `Elevation enriched (${elevMeta.source}). ${track.points.length} points.`
-          : `Route ready · ${track.points.length} points`,
+          ? `Elevation enriched (${elevMeta.source}). ${geometryLabel}.`
+          : `Ready · ${geometryLabel}`,
         "ok"
       );
     } else {
       setStatus(
-        `Route ready · ${track.points.length} points · elevation from KML`,
+        `Ready · ${geometryLabel} · elevation from KML`,
         "ok"
       );
     }
@@ -506,6 +602,16 @@ function closeUrlModal(): void {
   els.urlError.textContent = "";
 }
 
+function openStyleModal(): void {
+  syncLineStyleInputs();
+  els.styleModal.hidden = false;
+  els.lineColor.focus();
+}
+
+function closeStyleModal(): void {
+  els.styleModal.hidden = true;
+}
+
 function submitUrlModal(): void {
   const result = validateKmlUrl(els.urlInput.value);
   if (!result.ok) {
@@ -541,6 +647,18 @@ async function loadUrl(url: string, label?: string): Promise<void> {
   }
 }
 
+els.lineColor.addEventListener("input", () => {
+  applyLineStyle(readLineStyleFromInputs());
+});
+
+els.lineWidth.addEventListener("input", () => {
+  applyLineStyle(readLineStyleFromInputs());
+});
+
+els.lineOpacity.addEventListener("input", () => {
+  applyLineStyle(readLineStyleFromInputs());
+});
+
 els.slider.addEventListener("input", () => {
   updateInfo(Number(els.slider.value));
 });
@@ -572,6 +690,14 @@ els.btnOpenUrl.addEventListener("click", () => {
   openUrlModal();
 });
 
+els.btnLineStyle.addEventListener("click", () => {
+  openStyleModal();
+});
+
+els.btnStyleDone.addEventListener("click", () => {
+  closeStyleModal();
+});
+
 els.btnUrlCancel.addEventListener("click", () => {
   closeUrlModal();
 });
@@ -594,9 +720,21 @@ els.urlModal.addEventListener("click", (e) => {
   }
 });
 
+els.styleModal.addEventListener("click", (e) => {
+  const target = e.target as HTMLElement | null;
+  if (target?.closest("[data-close-style-modal]")) {
+    closeStyleModal();
+  }
+});
+
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !els.urlModal.hidden) {
+  if (e.key !== "Escape") return;
+  if (!els.urlModal.hidden) {
     closeUrlModal();
+    return;
+  }
+  if (!els.styleModal.hidden) {
+    closeStyleModal();
   }
 });
 
@@ -617,6 +755,8 @@ map.getContainer().addEventListener("click", (e) => {
 window.addEventListener("resize", () => {
   map.invalidateSize();
 });
+
+syncLineStyleInputs();
 
 const fromQuery = resolveUrlParam();
 if (fromQuery) {

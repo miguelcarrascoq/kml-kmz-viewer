@@ -15,6 +15,8 @@ export interface RawCoordinate {
 export interface Track {
   name: string;
   points: TrackPoint[];
+  /** Separate LineString / LinearRing geometries (not joined into one path). */
+  paths: RawCoordinate[][];
   hasRealElevation: boolean;
   totalDistanceM: number;
 }

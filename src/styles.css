@@ -210,6 +210,18 @@ body {
   background: #0a1016;
 }
 
+.map-style-btn {
+  position: absolute;
+  z-index: 500;
+  left: 10px;
+  bottom: 10px;
+  box-shadow: 0 0 0 1px rgba(45, 212, 168, 0.25), 0 4px 14px rgba(45, 212, 168, 0.18);
+}
+
+.map-style-btn:hover {
+  box-shadow: 0 0 0 1px rgba(45, 212, 168, 0.4), 0 6px 18px rgba(45, 212, 168, 0.28);
+}
+
 .side-panel {
   display: flex;
   flex-direction: column;
@@ -360,6 +372,51 @@ body {
 
 .status.ok {
   color: var(--accent);
+}
+
+.modal-panel--style {
+  width: min(360px, 100%);
+}
+
+.style-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.style-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.style-field em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  float: right;
+}
+
+.style-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.style-field input[type="color"] {
+  width: 100%;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: #121820;
+  cursor: pointer;
 }
 
 .chart-wrap {

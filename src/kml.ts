@@ -78,25 +78,36 @@ function dedupeConsecutive(points: RawCoordinate[]): RawCoordinate[] {
   return out;
 }
 
-function withDistances(points: RawCoordinate[]): TrackPoint[] {
+function coordinatesOf(el: Element): RawCoordinate[] {
+  const coordEl = findFirst(el, "coordinates");
+  return coordEl ? parseCoordinates(textOf(coordEl)) : [];
+}
+
+function flattenPaths(paths: RawCoordinate[][]): TrackPoint[] {
+  const out: TrackPoint[] = [];
   let cum = 0;
-  return points.map((p, i) => {
-    if (i > 0) {
-      const prev = points[i - 1]!;
-      cum += haversine(prev.lat, prev.lon, p.lat, p.lon);
+  for (const path of paths) {
+    const pts = dedupeConsecutive(path);
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i]!;
+      if (i > 0) {
+        const prev = pts[i - 1]!;
+        cum += haversine(prev.lat, prev.lon, p.lat, p.lon);
+      }
+      out.push({
+        lat: p.lat,
+        lon: p.lon,
+        elev: p.elev,
+        index: out.length,
+        distanceM: cum,
+      });
     }
-    return {
-      lat: p.lat,
-      lon: p.lon,
-      elev: p.elev,
-      index: i,
-      distanceM: cum,
-    };
-  });
+  }
+  return out;
 }
 
 /**
- * Parse KML text into named track points from LineString coordinates.
+ * Parse KML into separate LineString / LinearRing paths.
  * Coordinate order in KML: lon,lat[,altitude]
  */
 export function parseKml(text: string): Track {
@@ -110,17 +121,30 @@ export function parseKml(text: string): Track {
     findFirst(doc, "name") || doc.getElementsByTagNameNS(KML_NS, "name")[0];
   const name = textOf(nameEl ?? null) || "Unnamed route";
 
-  const coordEls = findAll(doc, "coordinates");
-  let raw: RawCoordinate[] = [];
-  for (const el of coordEls) {
-    raw = raw.concat(parseCoordinates(textOf(el)));
+  const geomEls = [
+    ...findAll(doc, "linestring"),
+    ...findAll(doc, "linearring"),
+  ];
+  const paths: RawCoordinate[][] = [];
+  for (const el of geomEls) {
+    const pts = coordinatesOf(el);
+    if (pts.length >= 2) paths.push(pts);
   }
 
-  if (raw.length === 0) {
+  if (paths.length === 0) {
+    const coordEls = findAll(doc, "coordinates");
+    let raw: RawCoordinate[] = [];
+    for (const el of coordEls) {
+      raw = raw.concat(parseCoordinates(textOf(el)));
+    }
+    if (raw.length >= 2) paths.push(raw);
+  }
+
+  if (paths.length === 0) {
     throw new Error("No coordinates found in the KML");
   }
 
-  const points = withDistances(dedupeConsecutive(raw));
+  const points = flattenPaths(paths);
   const hasRealElevation = points.some(
     (p) => p.elev != null && Math.abs(p.elev) > 0.01
   );
@@ -128,6 +152,7 @@ export function parseKml(text: string): Track {
   return {
     name,
     points,
+    paths,
     hasRealElevation,
     totalDistanceM: points.length ? points[points.length - 1]!.distanceM : 0,
   };
