@@ -34,6 +34,8 @@ https://miguelcarrascoq.github.io/kml-viewer/?url=https%3A%2F%2Fraw.githubuserco
 
 The KML host must allow CORS (`Access-Control-Allow-Origin`). Public Google Drive links are converted to a direct-download URL when possible, but Drive often blocks `fetch` from the browser.
 
+If the host does not allow CORS, download the `.kml` yourself (the app shows an **Open / download file** link on failure) and load it with **Open KML**.
+
 ## Local usage
 
 ```bash

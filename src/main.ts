@@ -174,8 +174,25 @@ L.control
 const routeLayer = L.layerGroup().addTo(map);
 
 function setStatus(msg: string, kind: StatusKind = ""): void {
+  els.status.replaceChildren();
   els.status.textContent = msg || "";
   els.status.className = "status" + (kind ? ` ${kind}` : "");
+}
+
+function setCorsFailureStatus(url: string): void {
+  els.status.replaceChildren();
+  els.status.className = "status error";
+
+  els.status.append("Could not load KML (network or CORS). ");
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Open / download file";
+  els.status.append(link);
+
+  els.status.append(", then load it with Open KML.");
 }
 
 function formatKm(m: number): string {
@@ -689,10 +706,7 @@ async function loadUrl(url: string, label?: string): Promise<void> {
       err instanceof TypeError ||
       /failed to fetch|networkerror|load failed/i.test(msg);
     if (isNetwork) {
-      setStatus(
-        "Could not load KML (network or CORS). The server must allow fetch from this origin; Google Drive often blocks it. Download the file and load it with Open KML instead.",
-        "error"
-      );
+      setCorsFailureStatus(url);
     } else {
       setStatus(`Could not load KML: ${msg}`, "error");
     }

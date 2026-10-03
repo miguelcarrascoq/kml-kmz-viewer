@@ -177,6 +177,13 @@ body {
   border-color: var(--accent-dim);
 }
 
+.modal-hint {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
 .modal-error {
   margin: 8px 0 0;
   min-height: 1.2em;
@@ -364,6 +371,7 @@ body {
   font-size: 0.8rem;
   color: var(--muted);
   min-height: 1.2em;
+  line-height: 1.4;
 }
 
 .status.error {
@@ -372,6 +380,16 @@ body {
 
 .status.ok {
   color: var(--accent);
+}
+
+.status a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.status a:hover {
+  color: var(--text);
 }
 
 .modal-panel--style {
