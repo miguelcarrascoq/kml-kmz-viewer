@@ -269,6 +269,111 @@ body {
   flex-direction: column;
 }
 
+.kml-tree-card {
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.kml-tree {
+  overflow: auto;
+  font-size: 0.82rem;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.kml-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+}
+
+.kml-tree > ul {
+  padding-left: 0;
+}
+
+.kml-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 2px;
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.kml-tree-row:hover {
+  background: rgba(139, 154, 171, 0.1);
+}
+
+.kml-tree-toggle {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.7rem;
+}
+
+.kml-tree-toggle:disabled {
+  visibility: hidden;
+}
+
+.kml-tree-check {
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.kml-tree-swatch {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(232, 238, 244, 0.25);
+  background: var(--accent);
+}
+
+.kml-tree-icon {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 2px;
+}
+
+.kml-tree-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.kml-tree-label:hover {
+  color: var(--accent);
+}
+
+.kml-tree-meta {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.kml-tree-children[hidden] {
+  display: none;
+}
+
 .card-head {
   display: flex;
   align-items: center;

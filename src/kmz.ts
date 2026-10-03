@@ -3,6 +3,12 @@ import { unzipSync } from "fflate";
 const ZIP_LOCAL = [0x50, 0x4b, 0x03, 0x04];
 const ZIP_EMPTY = [0x50, 0x4b, 0x05, 0x06];
 
+export interface KmzArchive {
+  kmlText: string;
+  resolveHref: (href: string) => string | null;
+  revoke: () => void;
+}
+
 function hasZipSignature(bytes: Uint8Array): boolean {
   if (bytes.length < 4) return false;
   const local =
@@ -47,6 +53,10 @@ function basename(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+function normalizeZipPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
 function pickKmlEntry(names: string[]): string | null {
   const kmlNames = names.filter((n) => /\.kml$/i.test(n) && !n.endsWith("/"));
   if (kmlNames.length === 0) return null;
@@ -58,8 +68,39 @@ function pickKmlEntry(names: string[]): string | null {
   return root ?? kmlNames[0] ?? null;
 }
 
-/** Unzip a KMZ and return the main KML document as UTF-8 text. */
-export function extractKmlFromKmz(buffer: ArrayBuffer): string {
+function mimeForPath(path: string): string {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".bmp")) return "image/bmp";
+  return "application/octet-stream";
+}
+
+function dirname(path: string): string {
+  const norm = normalizeZipPath(path);
+  const idx = norm.lastIndexOf("/");
+  return idx === -1 ? "" : norm.slice(0, idx);
+}
+
+function joinZipPath(baseDir: string, rel: string): string {
+  const parts = [...(baseDir ? baseDir.split("/") : []), ...rel.split("/")];
+  const out: string[] = [];
+  for (const part of parts) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      out.pop();
+      continue;
+    }
+    out.push(part);
+  }
+  return out.join("/");
+}
+
+/** Unzip a KMZ and expose the main KML plus href resolution into blob URLs. */
+export function openKmz(buffer: ArrayBuffer): KmzArchive {
   let files: Record<string, Uint8Array>;
   try {
     files = unzipSync(new Uint8Array(buffer));
@@ -67,15 +108,76 @@ export function extractKmlFromKmz(buffer: ArrayBuffer): string {
     throw new Error("Invalid or corrupted KMZ archive");
   }
 
-  const entry = pickKmlEntry(Object.keys(files));
-  if (!entry) {
+  const entryNames = Object.keys(files).filter((n) => !n.endsWith("/"));
+  const kmlEntry = pickKmlEntry(entryNames);
+  if (!kmlEntry) {
     throw new Error("No KML file found inside the KMZ");
   }
 
-  const data = files[entry];
-  if (!data) {
+  const kmlData = files[kmlEntry];
+  if (!kmlData) {
     throw new Error("No KML file found inside the KMZ");
   }
 
-  return new TextDecoder("utf-8").decode(data);
+  const kmlText = new TextDecoder("utf-8").decode(kmlData);
+  const kmlDir = dirname(kmlEntry);
+  const blobUrls: string[] = [];
+
+  const byLower = new Map<string, string>();
+  for (const name of entryNames) {
+    byLower.set(normalizeZipPath(name).toLowerCase(), name);
+  }
+
+  function findFile(path: string): Uint8Array | null {
+    const norm = normalizeZipPath(path);
+    const exact = files[norm] ?? files[byLower.get(norm.toLowerCase()) ?? ""];
+    if (exact) return exact;
+    const base = basename(norm).toLowerCase();
+    for (const name of entryNames) {
+      if (basename(name).toLowerCase() === base) return files[name] ?? null;
+    }
+    return null;
+  }
+
+  function resolveHref(href: string): string | null {
+    const trimmed = href.trim();
+    if (!trimmed) return null;
+    if (/^(https?:|data:|blob:)/i.test(trimmed)) return trimmed;
+
+    const cleaned = trimmed.replace(/^file:\/*/i, "");
+    const candidates = [
+      joinZipPath(kmlDir, cleaned),
+      normalizeZipPath(cleaned),
+      joinZipPath(kmlDir, basename(cleaned)),
+    ];
+
+    for (const candidate of candidates) {
+      const data = findFile(candidate);
+      if (!data) continue;
+      const copy = new Uint8Array(data.byteLength);
+      copy.set(data);
+      const blob = new Blob([copy], { type: mimeForPath(candidate) });
+      const url = URL.createObjectURL(blob);
+      blobUrls.push(url);
+      return url;
+    }
+    return null;
+  }
+
+  return {
+    kmlText,
+    resolveHref,
+    revoke() {
+      for (const url of blobUrls) URL.revokeObjectURL(url);
+      blobUrls.length = 0;
+    },
+  };
+}
+
+/** @deprecated Prefer openKmz for asset resolution. */
+export function extractKmlFromKmz(buffer: ArrayBuffer): string {
+  const archive = openKmz(buffer);
+  const text = archive.kmlText;
+  archive.revoke();
+  return text;
 }

@@ -10,6 +10,8 @@ Built with **TypeScript + Vite** (no UI framework). Leaflet and Chart.js stay im
 
 - Load `.kml` or `.kmz` files (or the included sample)
 - Remote load via **Open URL** or GET parameter `?url=` (public KML/KMZ with CORS)
+- **Layers** tree when the file has folders / multiple placemarks (toggle, zoom, KML line colors)
+- Placemark **icons** (`IconStyle`) and **GroundOverlay** images (including assets inside KMZ)
 - Map layers: **Road**, **Satellite**, and **Hybrid** (OpenStreetMap + Esri)
 - Slider to scrub through each point on the route
 - Popup / panel with latitude, longitude, elevation, and cumulative distance
@@ -62,8 +64,8 @@ CI builds with Vite and deploys `dist/` via [`.github/workflows/deploy.yml`](.gi
 ```
 src/
   main.ts        # app orchestration (map, UI, loaders)
-  kml.ts         # KML parse + haversine
-  kmz.ts         # KMZ (ZIP) detect + extract main KML
+  kml.ts         # KML parse (paths, folders, styles, points, overlays)
+  kmz.ts         # KMZ unzip + resolve embedded icon/overlay hrefs
   elevation.ts   # Open-Meteo + Chart.js profile
   geocode.ts     # reverse geocoding providers
   types.ts       # Track / TrackPoint contracts

@@ -11,8 +11,16 @@ import {
 } from "./elevation";
 import { reverseGeocode } from "./geocode";
 import { haversine, parseKml } from "./kml";
-import { extractKmlFromKmz, isKmz } from "./kmz";
-import type { ElevationMeta, PopupOpts, StatusKind, Track, TrackPoint } from "./types";
+import { isKmz, openKmz, type KmzArchive } from "./kmz";
+import type {
+  ElevationMeta,
+  HrefResolver,
+  KmlTreeNode,
+  PopupOpts,
+  StatusKind,
+  Track,
+  TrackPoint,
+} from "./types";
 
 // Vite rewrites asset URLs; Leaflet's default icon paths break without this.
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -66,6 +74,9 @@ const els = {
   pointRadiusValue: requireEl<HTMLElement>("point-radius-value"),
   pointOpacity: requireEl<HTMLInputElement>("point-opacity"),
   pointOpacityValue: requireEl<HTMLElement>("point-opacity-value"),
+  treeCard: requireEl<HTMLElement>("kml-tree-card"),
+  treeRoot: requireEl<HTMLDivElement>("kml-tree"),
+  treeCount: requireEl<HTMLSpanElement>("kml-tree-count"),
 };
 
 interface LineStyle {
@@ -111,11 +122,17 @@ interface AppState {
   index: number;
   chart: ElevationChart | null;
   polyline: L.Polyline | null;
+  pathLayers: L.Polyline[];
+  pathHasKmlStyle: boolean[];
+  pointLayers: L.Marker[];
+  overlayLayers: L.ImageOverlay[];
   marker: L.Marker | null;
   vertices: L.LayerGroup | null;
   addressCache: Map<number, string>;
   lineStyle: LineStyle;
   pointStyle: PointStyle;
+  track: Track | null;
+  archive: KmzArchive | null;
 }
 
 const state: AppState = {
@@ -124,11 +141,17 @@ const state: AppState = {
   index: 0,
   chart: null,
   polyline: null,
+  pathLayers: [],
+  pathHasKmlStyle: [],
+  pointLayers: [],
+  overlayLayers: [],
   marker: null,
   vertices: null,
   addressCache: new Map(),
   lineStyle: { ...DEFAULT_LINE_STYLE },
   pointStyle: { ...DEFAULT_POINT_STYLE },
+  track: null,
+  archive: null,
 };
 
 const road = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -265,8 +288,9 @@ function pointMarkerOptions(style: PointStyle = state.pointStyle): L.CircleMarke
 function applyLineStyle(style: LineStyle = state.lineStyle): void {
   state.lineStyle = style;
   syncLineStyleInputs();
-  if (state.polyline) {
-    state.polyline.setStyle({
+  for (let i = 0; i < state.pathLayers.length; i++) {
+    if (state.pathHasKmlStyle[i]) continue;
+    state.pathLayers[i]!.setStyle({
       color: style.color,
       weight: style.weight,
       opacity: style.opacity,
@@ -424,57 +448,295 @@ async function inferAddress(optIndex?: number): Promise<void> {
 function clearRoute(): void {
   routeLayer.clearLayers();
   state.polyline = null;
+  state.pathLayers = [];
+  state.pathHasKmlStyle = [];
+  state.pointLayers = [];
+  state.overlayLayers = [];
   state.marker = null;
   state.vertices = null;
+  state.track = null;
   state.addressCache.clear();
   setAddressText(null);
   els.btnAddress.disabled = true;
+  els.treeCard.hidden = true;
+  els.treeRoot.replaceChildren();
   if (state.chart) {
     state.chart.destroy();
     state.chart = null;
   }
 }
 
+function revokeArchive(): void {
+  if (state.archive) {
+    state.archive.revoke();
+    state.archive = null;
+  }
+}
+
+function lineStyleForPath(
+  track: Track,
+  pathIndex: number,
+  fallback: LineStyle
+): LineStyle {
+  const kml = track.pathStyles?.[pathIndex];
+  if (!kml) return fallback;
+  return {
+    color: kml.color,
+    weight: kml.weight ?? fallback.weight,
+    opacity: kml.opacity,
+  };
+}
+
+function makeKmlIcon(href: string, scale = 1): L.Icon {
+  const size = Math.max(12, Math.round(32 * scale));
+  return L.icon({
+    iconUrl: href,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size + 4],
+  });
+}
+
+function setPathVisible(index: number, visible: boolean): void {
+  const layer = state.pathLayers[index];
+  if (!layer) return;
+  if (visible) {
+    if (!routeLayer.hasLayer(layer)) layer.addTo(routeLayer);
+  } else if (routeLayer.hasLayer(layer)) {
+    routeLayer.removeLayer(layer);
+  }
+}
+
+function setPointVisible(index: number, visible: boolean): void {
+  const layer = state.pointLayers[index];
+  if (!layer) return;
+  if (visible) {
+    if (!routeLayer.hasLayer(layer)) layer.addTo(routeLayer);
+  } else if (routeLayer.hasLayer(layer)) {
+    routeLayer.removeLayer(layer);
+  }
+}
+
+function setOverlayVisible(index: number, visible: boolean): void {
+  const layer = state.overlayLayers[index];
+  if (!layer) return;
+  if (visible) {
+    if (!routeLayer.hasLayer(layer)) layer.addTo(routeLayer);
+  } else if (routeLayer.hasLayer(layer)) {
+    routeLayer.removeLayer(layer);
+  }
+}
+
+function setNodeVisible(node: KmlTreeNode, visible: boolean): void {
+  for (const i of node.pathIndices ?? []) setPathVisible(i, visible);
+  for (const i of node.pointIndices ?? []) setPointVisible(i, visible);
+  for (const i of node.overlayIndices ?? []) setOverlayVisible(i, visible);
+  for (const child of node.children ?? []) setNodeVisible(child, visible);
+}
+
+function fitNode(node: KmlTreeNode): void {
+  const bounds = L.latLngBounds([]);
+  const collect = (n: KmlTreeNode): void => {
+    for (const i of n.pathIndices ?? []) {
+      const layer = state.pathLayers[i];
+      if (layer) bounds.extend(layer.getBounds());
+    }
+    for (const i of n.pointIndices ?? []) {
+      const layer = state.pointLayers[i];
+      if (layer) bounds.extend(layer.getLatLng());
+    }
+    for (const i of n.overlayIndices ?? []) {
+      const layer = state.overlayLayers[i];
+      if (layer) bounds.extend(layer.getBounds());
+    }
+    for (const c of n.children ?? []) collect(c);
+  };
+  collect(node);
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 18 });
+  }
+}
+
+function featureCount(node: KmlTreeNode): number {
+  let n =
+    (node.pathIndices?.length ?? 0) +
+    (node.pointIndices?.length ?? 0) +
+    (node.overlayIndices?.length ?? 0);
+  for (const child of node.children ?? []) n += featureCount(child);
+  return n;
+}
+
+function renderTree(tree: KmlTreeNode): void {
+  els.treeRoot.replaceChildren();
+  const count = featureCount(tree);
+  els.treeCount.textContent = String(count);
+  els.treeCard.hidden = false;
+
+  const ul = document.createElement("ul");
+  for (const child of tree.children ?? [tree]) {
+    ul.appendChild(buildTreeItem(child, true));
+  }
+  els.treeRoot.appendChild(ul);
+}
+
+function buildTreeItem(node: KmlTreeNode, expanded: boolean): HTMLLIElement {
+  const li = document.createElement("li");
+  const row = document.createElement("div");
+  row.className = "kml-tree-row";
+
+  const hasChildren = (node.children?.length ?? 0) > 0;
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "kml-tree-toggle";
+  toggle.textContent = hasChildren ? (expanded ? "▼" : "▶") : "";
+  toggle.disabled = !hasChildren;
+  toggle.setAttribute("aria-label", expanded ? "Collapse" : "Expand");
+
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.className = "kml-tree-check";
+  check.checked = true;
+  check.title = "Show / hide";
+  check.addEventListener("change", () => {
+    setNodeVisible(node, check.checked);
+  });
+
+  const swatch = document.createElement("span");
+  swatch.className = "kml-tree-swatch";
+  if (node.style?.color) {
+    swatch.style.background = node.style.color;
+    swatch.style.opacity = String(node.style.opacity ?? 1);
+  } else if (node.kind === "overlay") {
+    swatch.style.background = "#c4a35a";
+  } else if (node.kind === "folder") {
+    swatch.style.background = "transparent";
+    swatch.style.borderColor = "transparent";
+  } else {
+    swatch.style.background = state.lineStyle.color;
+  }
+
+  row.append(toggle, check, swatch);
+
+  if (node.iconHref) {
+    const img = document.createElement("img");
+    img.className = "kml-tree-icon";
+    img.src = node.iconHref;
+    img.alt = "";
+    row.appendChild(img);
+  }
+
+  const label = document.createElement("button");
+  label.type = "button";
+  label.className = "kml-tree-label";
+  label.textContent = node.name;
+  label.title = node.name;
+  label.addEventListener("click", () => fitNode(node));
+  row.appendChild(label);
+
+  if (node.kind === "folder") {
+    const meta = document.createElement("span");
+    meta.className = "kml-tree-meta";
+    meta.textContent = String(featureCount(node));
+    row.appendChild(meta);
+  }
+
+  li.appendChild(row);
+
+  if (hasChildren) {
+    const childUl = document.createElement("ul");
+    childUl.className = "kml-tree-children";
+    childUl.hidden = !expanded;
+    for (const child of node.children!) {
+      childUl.appendChild(buildTreeItem(child, false));
+    }
+    li.appendChild(childUl);
+    toggle.addEventListener("click", () => {
+      const open = childUl.hidden;
+      childUl.hidden = !open;
+      toggle.textContent = open ? "▼" : "▶";
+      toggle.setAttribute("aria-label", open ? "Collapse" : "Expand");
+    });
+  }
+
+  return li;
+}
+
 const MAX_VERTEX_MARKERS_POINTS = 2500;
 const MAX_ELEVATION_CHART_POINTS = 2500;
 const MAX_ELEVATION_ENRICH_POINTS = 1500;
-
-function pathLatLngs(track: Track): L.LatLngExpression[][] {
-  return track.paths
-    .map((path) => path.map((p) => [p.lat, p.lon] as L.LatLngExpression))
-    .filter((path) => path.length >= 2);
-}
 
 function drawRoute(track: Track): void {
   clearRoute();
   const points = track.points;
   state.points = points;
   state.name = track.name;
+  state.track = track;
   els.routeName.textContent = track.name;
-  applyLineStyle(suggestedLineStyle(track.paths.length));
 
-  if (!points.length) {
-    els.slider.disabled = true;
-    setStatus("Route has no points", "error");
-    return;
+  const fallback = suggestedLineStyle(track.paths.length);
+  applyLineStyle(fallback);
+
+  const bounds = L.latLngBounds([]);
+
+  for (let i = 0; i < track.paths.length; i++) {
+    const path = track.paths[i]!;
+    if (path.length < 2) continue;
+    const latlngs = path.map((p) => [p.lat, p.lon] as L.LatLngExpression);
+    const hasKml = !!track.pathStyles?.[i];
+    const style = lineStyleForPath(track, i, fallback);
+    const poly = L.polyline(latlngs, {
+      color: style.color,
+      weight: style.weight,
+      opacity: style.opacity,
+    }).addTo(routeLayer);
+    poly.on("click", (e: L.LeafletMouseEvent) => {
+      if (!state.points.length) return;
+      const nearest = nearestIndex(e.latlng.lat, e.latlng.lng);
+      updateInfo(nearest);
+      if (state.marker) state.marker.openPopup();
+    });
+    state.pathLayers.push(poly);
+    state.pathHasKmlStyle.push(hasKml);
+    bounds.extend(poly.getBounds());
   }
 
-  const latlngs = pathLatLngs(track);
-  const style = state.lineStyle;
-  state.polyline = L.polyline(latlngs, {
-    color: style.color,
-    weight: style.weight,
-    opacity: style.opacity,
-  }).addTo(routeLayer);
+  if (state.pathLayers.length === 1) {
+    state.polyline = state.pathLayers[0]!;
+  }
 
-  state.polyline.on("click", (e: L.LeafletMouseEvent) => {
-    const nearest = nearestIndex(e.latlng.lat, e.latlng.lng);
-    updateInfo(nearest);
-    if (state.marker) state.marker.openPopup();
-  });
+  for (const mp of track.mapPoints ?? []) {
+    const markerOpts: L.MarkerOptions = {
+      title: mp.name,
+      zIndexOffset: 400,
+    };
+    if (mp.style?.href) {
+      markerOpts.icon = makeKmlIcon(mp.style.href, mp.style.scale ?? 1);
+    }
+    const marker = L.marker([mp.lat, mp.lon], markerOpts)
+      .bindPopup(`<strong>${escapeHtml(mp.name)}</strong><br/>Lat: ${mp.lat.toFixed(6)}<br/>Lon: ${mp.lon.toFixed(6)}`)
+      .addTo(routeLayer);
+    state.pointLayers.push(marker);
+    bounds.extend(marker.getLatLng());
+  }
+
+  for (const ov of track.overlays ?? []) {
+    const image = L.imageOverlay(
+      ov.href,
+      [
+        [ov.south, ov.west],
+        [ov.north, ov.east],
+      ],
+      { opacity: ov.opacity, interactive: true }
+    ).addTo(routeLayer);
+    image.bindPopup(`<strong>${escapeHtml(ov.name)}</strong>`);
+    state.overlayLayers.push(image);
+    bounds.extend(image.getBounds());
+  }
 
   const showVertices =
-    track.paths.length === 1 && points.length <= MAX_VERTEX_MARKERS_POINTS;
+    track.paths.length === 1 &&
+    points.length > 0 &&
+    points.length <= MAX_VERTEX_MARKERS_POINTS;
   if (showVertices) {
     const step = Math.max(1, Math.floor(points.length / 80));
     const pointOpts = pointMarkerOptions();
@@ -497,29 +759,48 @@ function drawRoute(track: Track): void {
     state.vertices.addTo(routeLayer);
   }
 
-  const first = points[0]!;
-  state.marker = L.marker([first.lat, first.lon], {
-    draggable: false,
-    title: "Current position",
-    zIndexOffset: 1000,
-  })
-    .bindPopup(pointPopupHtml(first))
-    .addTo(routeLayer);
+  if (points.length) {
+    const first = points[0]!;
+    state.marker = L.marker([first.lat, first.lon], {
+      draggable: false,
+      title: "Current position",
+      zIndexOffset: 1000,
+    })
+      .bindPopup(pointPopupHtml(first))
+      .addTo(routeLayer);
 
-  map.fitBounds(state.polyline.getBounds(), { padding: [28, 28] });
+    els.slider.disabled = false;
+    els.slider.min = "0";
+    els.slider.max = String(points.length - 1);
+    els.slider.value = "0";
 
-  els.slider.disabled = false;
-  els.slider.min = "0";
-  els.slider.max = String(points.length - 1);
-  els.slider.value = "0";
-
-  if (points.length <= MAX_ELEVATION_CHART_POINTS) {
-    state.chart = createElevationChart(els.chartCanvas, points);
-    wireChartSelect(state.chart);
+    if (points.length <= MAX_ELEVATION_CHART_POINTS) {
+      state.chart = createElevationChart(els.chartCanvas, points);
+      wireChartSelect(state.chart);
+    } else {
+      state.chart = null;
+    }
+    updateInfo(0);
   } else {
-    state.chart = null;
+    els.slider.disabled = true;
+    els.slider.value = "0";
+    els.sliderLabel.textContent = "0 / 0";
+    els.distanceLabel.textContent = "0 km";
+    els.pointBadge.textContent = "—";
+    els.infoLat.textContent = "—";
+    els.infoLon.textContent = "—";
+    els.infoElev.textContent = "—";
+    els.infoDist.textContent = "—";
+    els.btnAddress.disabled = true;
   }
-  updateInfo(0);
+
+  if (track.tree) {
+    renderTree(track.tree);
+  }
+
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, { padding: [28, 28] });
+  }
 }
 
 function nearestIndex(lat: number, lon: number): number {
@@ -542,29 +823,40 @@ async function loadFromBytes(
   label?: string,
   contentType?: string | null
 ): Promise<void> {
+  revokeArchive();
   let text: string;
+  let resolveHref: HrefResolver | undefined;
   try {
     if (isKmz(buffer, label, contentType)) {
       setStatus(`Extracting ${label || "KMZ"}…`);
-      text = extractKmlFromKmz(buffer);
+      const archive = openKmz(buffer);
+      state.archive = archive;
+      text = archive.kmlText;
+      resolveHref = (href) => archive.resolveHref(href);
     } else {
       text = new TextDecoder("utf-8").decode(buffer);
     }
   } catch (err) {
+    revokeArchive();
     const message = err instanceof Error ? err.message : "Error reading file";
     setStatus(message, "error");
     return;
   }
-  await loadFromText(text, label);
+  await loadFromText(text, label, resolveHref);
 }
 
-async function loadFromText(text: string, label?: string): Promise<void> {
+async function loadFromText(
+  text: string,
+  label?: string,
+  resolveHref?: HrefResolver
+): Promise<void> {
   setStatus(`Processing ${label || "KML"}…`);
   els.slider.disabled = true;
   let track: Track;
   try {
-    track = parseKml(text);
+    track = parseKml(text, resolveHref);
   } catch (err) {
+    revokeArchive();
     const message = err instanceof Error ? err.message : "Error reading KML";
     setStatus(message, "error");
     return;
@@ -574,48 +866,64 @@ async function loadFromText(text: string, label?: string): Promise<void> {
 
   const pathCount = track.paths.length;
   const pointCount = track.points.length;
+  const mapPointCount = track.mapPoints?.length ?? 0;
+  const overlayCount = track.overlays?.length ?? 0;
+  const extras: string[] = [];
+  if (mapPointCount) extras.push(`${mapPointCount.toLocaleString()} markers`);
+  if (overlayCount) extras.push(`${overlayCount.toLocaleString()} overlays`);
   const geometryLabel =
     pathCount > 1
       ? `${pathCount.toLocaleString()} outlines · ${pointCount.toLocaleString()} vertices`
-      : `${pointCount.toLocaleString()} points`;
+      : pointCount
+        ? `${pointCount.toLocaleString()} points`
+        : "no route line";
+  const fullLabel = extras.length
+    ? `${geometryLabel} · ${extras.join(" · ")}`
+    : geometryLabel;
 
   let elevMeta: ElevationMeta = {
-    source: track.hasRealElevation ? "KML" : "KML (no altitude)",
+    source: track.hasRealElevation
+      ? "KML"
+      : pointCount
+        ? "KML (no altitude)"
+        : "—",
     enriched: false,
   };
   try {
-    const tooLargeToEnrich = pointCount > MAX_ELEVATION_ENRICH_POINTS || pathCount > 8;
-    if (tooLargeToEnrich && needsElevationEnrichment(track.points)) {
-      elevMeta = { source: "Skipped (large KML)", enriched: false };
-      setStatus(`Ready · ${geometryLabel}`, "ok");
-    } else if (needsElevationEnrichment(track.points)) {
-      elevMeta = await ensureElevations(track.points, (msg) => setStatus(msg));
-      if (state.chart) {
-        state.chart.destroy();
-        state.chart = createElevationChart(els.chartCanvas, track.points);
-        wireChartSelect(state.chart);
-        updateInfo(state.index);
-      }
-      if (state.vertices) {
-        state.vertices.eachLayer((layer) => {
-          const marker = layer as L.CircleMarker;
-          const ll = marker.getLatLng();
-          const idx = nearestIndex(ll.lat, ll.lng);
-          const point = track.points[idx];
-          if (point) marker.setPopupContent(pointPopupHtml(point));
-        });
-      }
-      setStatus(
-        elevMeta.enriched
-          ? `Elevation enriched (${elevMeta.source}). ${geometryLabel}.`
-          : `Ready · ${geometryLabel}`,
-        "ok"
-      );
+    if (!pointCount) {
+      setStatus(`Ready · ${fullLabel}`, "ok");
     } else {
-      setStatus(
-        `Ready · ${geometryLabel} · elevation from KML`,
-        "ok"
-      );
+      const tooLargeToEnrich =
+        pointCount > MAX_ELEVATION_ENRICH_POINTS || pathCount > 8;
+      if (tooLargeToEnrich && needsElevationEnrichment(track.points)) {
+        elevMeta = { source: "Skipped (large KML)", enriched: false };
+        setStatus(`Ready · ${fullLabel}`, "ok");
+      } else if (needsElevationEnrichment(track.points)) {
+        elevMeta = await ensureElevations(track.points, (msg) => setStatus(msg));
+        if (state.chart) {
+          state.chart.destroy();
+          state.chart = createElevationChart(els.chartCanvas, track.points);
+          wireChartSelect(state.chart);
+          updateInfo(state.index);
+        }
+        if (state.vertices) {
+          state.vertices.eachLayer((layer) => {
+            const marker = layer as L.CircleMarker;
+            const ll = marker.getLatLng();
+            const idx = nearestIndex(ll.lat, ll.lng);
+            const point = track.points[idx];
+            if (point) marker.setPopupContent(pointPopupHtml(point));
+          });
+        }
+        setStatus(
+          elevMeta.enriched
+            ? `Elevation enriched (${elevMeta.source}). ${fullLabel}.`
+            : `Ready · ${fullLabel}`,
+          "ok"
+        );
+      } else {
+        setStatus(`Ready · ${fullLabel} · elevation from KML`, "ok");
+      }
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
