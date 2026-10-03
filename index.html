@@ -19,7 +19,10 @@
   <header class="topbar">
     <div class="brand">
       <h1>KML Viewer</h1>
-      <p class="subtitle" id="route-name">Loading route…</p>
+      <div class="brand-meta">
+        <p class="subtitle" id="route-name">Loading route…</p>
+        <p class="status" id="status-msg" role="status"></p>
+      </div>
     </div>
     <div class="actions">
       <label class="btn file-btn">
@@ -154,9 +157,8 @@
           <button type="button" class="btn" id="btn-address" disabled>
             Infer address
           </button>
-          <p class="address-text" id="info-address" aria-live="polite">—</p>
+          <p class="address-text" id="info-address" aria-live="polite" hidden></p>
         </div>
-        <p class="status" id="status-msg" role="status"></p>
       </section>
 
       <section class="card chart-card" aria-label="Elevation profile">

@@ -54,14 +54,29 @@ body {
   letter-spacing: 0.02em;
 }
 
+.brand-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.55em;
+  margin-top: 2px;
+  min-width: 0;
+}
+
 .subtitle {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: 0.8rem;
   color: var(--muted);
-  max-width: 42ch;
+  max-width: 28ch;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.brand-meta .status:not(:empty)::before {
+  content: "·";
+  margin-right: 0.55em;
+  color: var(--muted);
 }
 
 .actions {
@@ -363,15 +378,19 @@ body {
   font-size: 0.85rem;
   line-height: 1.35;
   color: var(--text);
-  min-height: 2.4em;
+}
+
+.address-text[hidden] {
+  display: none;
 }
 
 .status {
-  margin: 10px 0 0;
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 12rem;
   font-size: 0.8rem;
   color: var(--muted);
-  min-height: 1.2em;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .status.error {
@@ -552,9 +571,14 @@ body {
     justify-content: center;
   }
 
-  .subtitle {
+  .subtitle,
+  .status {
     max-width: none;
     white-space: normal;
+  }
+
+  .brand-meta .status:not(:empty)::before {
+    display: none;
   }
 
   .layout {
@@ -618,10 +642,6 @@ body {
   }
 
   .address-row {
-    margin-top: 8px;
-  }
-
-  .status {
     margin-top: 8px;
   }
 

@@ -179,6 +179,12 @@ function setStatus(msg: string, kind: StatusKind = ""): void {
   els.status.className = "status" + (kind ? ` ${kind}` : "");
 }
 
+function setAddressText(text: string | null): void {
+  const value = text?.trim() ?? "";
+  els.infoAddress.textContent = value;
+  els.infoAddress.hidden = !value;
+}
+
 function setCorsFailureStatus(url: string): void {
   els.status.replaceChildren();
   els.status.className = "status error";
@@ -361,7 +367,7 @@ function updateInfo(index: number): void {
   els.btnAddress.disabled = false;
 
   const cached = state.addressCache.get(i);
-  els.infoAddress.textContent = cached || 'Press "Infer address" for this point';
+  setAddressText(cached ?? null);
 
   if (state.marker) {
     state.marker.setLatLng([p.lat, p.lon]);
@@ -385,26 +391,26 @@ async function inferAddress(optIndex?: number): Promise<void> {
 
   if (state.addressCache.has(forIndex)) {
     const text = state.addressCache.get(forIndex)!;
-    els.infoAddress.textContent = text;
+    setAddressText(text);
     setPopupContentForIndex(forIndex);
     return;
   }
 
   els.btnAddress.disabled = true;
-  els.infoAddress.textContent = "Looking up address…";
+  setAddressText("Looking up address…");
   setPopupContentForIndex(forIndex, { loading: true });
   try {
     const { text, source } = await reverseGeocode(p.lat, p.lon);
     state.addressCache.set(forIndex, text);
     if (state.index === forIndex) {
-      els.infoAddress.textContent = text;
+      setAddressText(text);
       setStatus(`Address via ${source}`, "ok");
     }
     setPopupContentForIndex(forIndex);
   } catch (err) {
     const msg = "Could not get address";
     if (state.index === forIndex) {
-      els.infoAddress.textContent = msg;
+      setAddressText(msg);
       const message = err instanceof Error ? err.message : "Geocoding error";
       setStatus(message, "error");
     }
@@ -420,7 +426,7 @@ function clearRoute(): void {
   state.marker = null;
   state.vertices = null;
   state.addressCache.clear();
-  els.infoAddress.textContent = "—";
+  setAddressText(null);
   els.btnAddress.disabled = true;
   if (state.chart) {
     state.chart.destroy();
