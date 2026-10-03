@@ -565,7 +565,7 @@ els.file.addEventListener("change", async () => {
 });
 
 els.btnSample.addEventListener("click", () => {
-  void loadUrl(SAMPLE_KML, "demo data");
+  void loadUrl(SAMPLE_KML, "Demo data");
 });
 
 els.btnOpenUrl.addEventListener("click", () => {
@@ -622,5 +622,5 @@ const fromQuery = resolveUrlParam();
 if (fromQuery) {
   void loadUrl(fromQuery.url, fromQuery.label);
 } else if (fromQuery !== false) {
-  void loadUrl(SAMPLE_KML, "demo data");
+  void loadUrl(SAMPLE_KML, "Demo data");
 }
