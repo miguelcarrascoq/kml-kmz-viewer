@@ -532,7 +532,7 @@ async function loadUrl(url: string, label?: string): Promise<void> {
       /failed to fetch|networkerror|load failed/i.test(msg);
     if (isNetwork) {
       setStatus(
-        "Could not load KML (network or CORS). The server must allow fetch from this origin; Google Drive often blocks it.",
+        "Could not load KML (network or CORS). The server must allow fetch from this origin; Google Drive often blocks it. Download the file and load it with Open KML instead.",
         "error"
       );
     } else {
