@@ -1,5 +1,5 @@
 {
-  "name": "kml-viewer",
+  "name": "kml-kmz-viewer",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "chart.js": "^4.4.6",
+    "fflate": "^0.8.3",
     "leaflet": "^1.9.4"
   },
   "devDependencies": {

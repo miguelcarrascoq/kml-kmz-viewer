@@ -11,6 +11,7 @@ import {
 } from "./elevation";
 import { reverseGeocode } from "./geocode";
 import { haversine, parseKml } from "./kml";
+import { extractKmlFromKmz, isKmz } from "./kmz";
 import type { ElevationMeta, PopupOpts, StatusKind, Track, TrackPoint } from "./types";
 
 // Vite rewrites asset URLs; Leaflet's default icon paths break without this.
@@ -189,7 +190,7 @@ function setCorsFailureStatus(url: string): void {
   els.status.replaceChildren();
   els.status.className = "status error";
 
-  els.status.append("Could not load KML (network or CORS). ");
+  els.status.append("Could not load KML/KMZ (network or CORS). ");
 
   const link = document.createElement("a");
   link.href = url;
@@ -198,7 +199,7 @@ function setCorsFailureStatus(url: string): void {
   link.textContent = "Open / download file";
   els.status.append(link);
 
-  els.status.append(", then load it with Open KML.");
+  els.status.append(", then load it with Open KML / KMZ.");
 }
 
 function formatKm(m: number): string {
@@ -536,6 +537,27 @@ function nearestIndex(lat: number, lon: number): number {
   return best;
 }
 
+async function loadFromBytes(
+  buffer: ArrayBuffer,
+  label?: string,
+  contentType?: string | null
+): Promise<void> {
+  let text: string;
+  try {
+    if (isKmz(buffer, label, contentType)) {
+      setStatus(`Extracting ${label || "KMZ"}…`);
+      text = extractKmlFromKmz(buffer);
+    } else {
+      text = new TextDecoder("utf-8").decode(buffer);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error reading file";
+    setStatus(message, "error");
+    return;
+  }
+  await loadFromText(text, label);
+}
+
 async function loadFromText(text: string, label?: string): Promise<void> {
   setStatus(`Processing ${label || "KML"}…`);
   els.slider.disabled = true;
@@ -704,8 +726,8 @@ async function loadUrl(url: string, label?: string): Promise<void> {
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    await loadFromText(text, label || url);
+    const buffer = await res.arrayBuffer();
+    await loadFromBytes(buffer, label || url, res.headers.get("content-type"));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isNetwork =
@@ -714,7 +736,7 @@ async function loadUrl(url: string, label?: string): Promise<void> {
     if (isNetwork) {
       setCorsFailureStatus(url);
     } else {
-      setStatus(`Could not load KML: ${msg}`, "error");
+      setStatus(`Could not load KML/KMZ: ${msg}`, "error");
     }
   }
 }
@@ -757,8 +779,8 @@ els.file.addEventListener("change", async () => {
   const file = els.file.files?.[0];
   if (!file) return;
   try {
-    const text = await file.text();
-    await loadFromText(text, file.name);
+    const buffer = await file.arrayBuffer();
+    await loadFromBytes(buffer, file.name, file.type || null);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error reading file";
     setStatus(message, "error");

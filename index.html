@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>KML Viewer</title>
+  <title>KML/KMZ Viewer</title>
   <style>
     html, body {
       margin: 0;
@@ -18,7 +18,7 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <h1>KML Viewer</h1>
+      <h1>KML/KMZ Viewer</h1>
       <div class="brand-meta">
         <p class="subtitle" id="route-name">Loading route…</p>
         <p class="status" id="status-msg" role="status"></p>
@@ -26,10 +26,10 @@
     </div>
     <div class="actions">
       <label class="btn file-btn">
-        Open KML
-        <input type="file" id="kml-file" accept=".kml,application/vnd.google-earth.kml+xml,text/xml" />
+        Open KML / KMZ
+        <input type="file" id="kml-file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip,text/xml" />
       </label>
-      <button type="button" class="btn secondary" id="btn-open-url" title="Load KML from a web address">
+      <button type="button" class="btn secondary" id="btn-open-url" title="Load KML or KMZ from a web address">
         Open URL
       </button>
       <button type="button" class="btn secondary" id="btn-sample" title="Load demo data">
@@ -48,19 +48,19 @@
   >
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-panel">
-      <h2 id="url-modal-title">Open KML from URL</h2>
-      <label class="modal-label" for="url-input">KML web address</label>
+      <h2 id="url-modal-title">Open KML / KMZ from URL</h2>
+      <label class="modal-label" for="url-input">KML or KMZ web address</label>
       <input
         type="url"
         id="url-input"
         class="modal-input"
-        placeholder="https://example.com/route.kml"
+        placeholder="https://example.com/route.kmz"
         autocomplete="off"
         spellcheck="false"
       />
       <p class="modal-hint">
         The host must allow CORS. If loading fails, download the file and use
-        <strong>Open KML</strong>.
+        <strong>Open KML / KMZ</strong>.
       </p>
       <p class="modal-error" id="url-error" role="alert"></p>
       <div class="modal-actions">

@@ -23,6 +23,6 @@ function cssBeforeJs(): Plugin {
 }
 
 export default defineConfig({
-  base: "/kml-viewer/",
+  base: "/kml-kmz-viewer/",
   plugins: [cssBeforeJs()],
 });
