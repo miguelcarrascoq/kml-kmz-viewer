@@ -19,11 +19,42 @@
         Open KML
         <input type="file" id="kml-file" accept=".kml,application/vnd.google-earth.kml+xml,text/xml" />
       </label>
+      <button type="button" class="btn secondary" id="btn-open-url" title="Load KML from a web address">
+        Open URL
+      </button>
       <button type="button" class="btn secondary" id="btn-sample" title="Load demo data">
         Demo data
       </button>
     </div>
   </header>
+
+  <div
+    class="modal"
+    id="url-modal"
+    hidden
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="url-modal-title"
+  >
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-panel">
+      <h2 id="url-modal-title">Open KML from URL</h2>
+      <label class="modal-label" for="url-input">KML web address</label>
+      <input
+        type="url"
+        id="url-input"
+        class="modal-input"
+        placeholder="https://example.com/route.kml"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <p class="modal-error" id="url-error" role="alert"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="btn-url-cancel">Cancel</button>
+        <button type="button" class="btn" id="btn-url-load">Load</button>
+      </div>
+    </div>
+  </div>
 
   <main class="layout">
     <section class="map-panel" aria-label="Map">

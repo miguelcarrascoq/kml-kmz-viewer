@@ -6,8 +6,14 @@
   const els = {
     routeName: document.getElementById("route-name"),
     file: document.getElementById("kml-file"),
+    btnOpenUrl: document.getElementById("btn-open-url"),
     btnSample: document.getElementById("btn-sample"),
     btnAddress: document.getElementById("btn-address"),
+    urlModal: document.getElementById("url-modal"),
+    urlInput: document.getElementById("url-input"),
+    urlError: document.getElementById("url-error"),
+    btnUrlCancel: document.getElementById("btn-url-cancel"),
+    btnUrlLoad: document.getElementById("btn-url-load"),
     slider: document.getElementById("route-slider"),
     sliderLabel: document.getElementById("slider-label"),
     distanceLabel: document.getElementById("distance-label"),
@@ -524,6 +530,32 @@
   }
 
   /**
+   * Validate a KML web address.
+   * Returns { ok: true, url, label } or { ok: false, error }.
+   */
+  function validateKmlUrl(raw) {
+    const trimmed = (raw || "").trim();
+    if (!trimmed) {
+      return { ok: false, error: "Enter a URL" };
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return { ok: false, error: "Invalid URL" };
+    }
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return { ok: false, error: "Only http and https URLs are supported" };
+    }
+
+    const resolved = normalizeGoogleDriveUrl(parsed.href);
+    const label = parsed.pathname.split("/").filter(Boolean).pop() || resolved;
+    return { ok: true, url: resolved, label };
+  }
+
+  /**
    * Resolve ?url= from the query string.
    * Returns { url, label }, false if present but invalid, or null if absent.
    */
@@ -531,22 +563,36 @@
     const raw = new URLSearchParams(window.location.search).get("url");
     if (!raw || !raw.trim()) return null;
 
-    let parsed;
-    try {
-      parsed = new URL(raw.trim());
-    } catch {
-      setStatus("Invalid url parameter (not a URL)", "error");
+    const result = validateKmlUrl(raw);
+    if (!result.ok) {
+      setStatus(`Invalid url parameter: ${result.error}`, "error");
       return false;
     }
+    return { url: result.url, label: result.label };
+  }
 
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      setStatus("Invalid url parameter (http/https only)", "error");
-      return false;
+  function openUrlModal() {
+    els.urlError.textContent = "";
+    els.urlInput.value = "";
+    els.urlModal.hidden = false;
+    els.urlInput.focus();
+  }
+
+  function closeUrlModal() {
+    els.urlModal.hidden = true;
+    els.urlError.textContent = "";
+  }
+
+  function submitUrlModal() {
+    const result = validateKmlUrl(els.urlInput.value);
+    if (!result.ok) {
+      els.urlError.textContent = result.error;
+      els.urlInput.focus();
+      return;
     }
-
-    const resolved = normalizeGoogleDriveUrl(parsed.href);
-    const label = parsed.pathname.split("/").filter(Boolean).pop() || resolved;
-    return { url: resolved, label };
+    els.urlError.textContent = "";
+    closeUrlModal();
+    loadUrl(result.url, result.label);
   }
 
   async function loadUrl(url, label) {
@@ -597,6 +643,37 @@
 
   els.btnSample.addEventListener("click", () => {
     loadUrl(SAMPLE_KML, "demo data");
+  });
+
+  els.btnOpenUrl.addEventListener("click", () => {
+    openUrlModal();
+  });
+
+  els.btnUrlCancel.addEventListener("click", () => {
+    closeUrlModal();
+  });
+
+  els.btnUrlLoad.addEventListener("click", () => {
+    submitUrlModal();
+  });
+
+  els.urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submitUrlModal();
+    }
+  });
+
+  els.urlModal.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close-modal]")) {
+      closeUrlModal();
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !els.urlModal.hidden) {
+      closeUrlModal();
+    }
   });
 
   els.btnAddress.addEventListener("click", () => {

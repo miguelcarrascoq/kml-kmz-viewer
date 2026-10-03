@@ -7,6 +7,7 @@ Web-based KML route viewer for desktop and mobile. Works on **GitHub Pages** wit
 ## Features
 
 - Load `.kml` files (or the included sample)
+- **Open URL** to load a public KML from a web address (validated before fetch; host must allow CORS)
 - Remote load via GET parameter `?url=` (public KML with CORS)
 - Map layers: **Road**, **Satellite**, and **Hybrid** (OpenStreetMap + Esri)
 - Slider to scrub through each point on the route
@@ -20,11 +21,11 @@ Web-based KML route viewer for desktop and mobile. Works on **GitHub Pages** wit
 |------|-------------|
 | `data/VID_20251121_030905_00_005.kml` | Demo data (loaded by default) |
 
-You can also open any local `.kml` with **Open KML**.
+You can open any local `.kml` with **Open KML**, or paste a public http/https link with **Open URL**.
 
 ## Load by URL
 
-Pass a public KML in the `url` parameter (must be URL-encoded):
+Use **Open URL** in the UI, or pass a public KML in the `url` parameter (must be URL-encoded):
 
 ```
 https://miguelcarrascoq.github.io/kml-viewer/?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmiguelcarrascoq%2Fkml-viewer%2Fmain%2Fdata%2FVID_20251121_030905_00_005.kml
