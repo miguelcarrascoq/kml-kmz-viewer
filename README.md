@@ -2,6 +2,8 @@
 
 Web-based KML and KMZ route viewer for desktop and mobile. Works on **GitHub Pages** with no paid map API keys.
 
+**Live demo:** https://miguelcarrascoq.github.io/kml-kmz-viewer/
+
 Built with **TypeScript + Vite** (no UI framework). Leaflet and Chart.js stay imperative for the map and elevation profile.
 
 ![KML/KMZ Viewer preview](docs/preview.jpg)
@@ -54,8 +56,6 @@ npm run typecheck
 ```
 
 ## GitHub Pages
-
-Published at: https://miguelcarrascoq.github.io/kml-kmz-viewer/
 
 CI builds with Vite and deploys `dist/` via [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). In the repo **Settings → Pages**, set the source to **GitHub Actions** (not “Deploy from a branch”).
 
